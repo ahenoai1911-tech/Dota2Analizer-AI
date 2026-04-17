@@ -1,0 +1,1715 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<title>Dota 2 Analyzer</title>
+<script src="https://telegram.org/js/telegram-web-app.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.1/chart.umd.min.js"></script>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet"/>
+<style>
+:root{
+  /* Unique Modern Palette - Purple/Cyan theme */
+  --bg-primary:#0a0e27;
+  --bg-secondary:#141b3a;
+  --bg-card:#1a2347;
+  --bg-card-hover:#212d5a;
+  --border:#2d3a6e;
+  --accent-primary:#8b5cf6;
+  --accent-secondary:#06b6d4;
+  --accent-gradient:linear-gradient(135deg, #8b5cf6 0%, #06b6d4 100%);
+  --text-primary:#f0f4ff;
+  --text-secondary:#a5b4fc;
+  --text-muted:#6b7bb8;
+  --success:#10b981;
+  --warning:#f59e0b;
+  --error:#ef4444;
+  --gold:#fbbf24;
+  --nav-h:60px;
+  --r:16px;--r2:12px;--r3:8px;
+  --shadow-sm:0 2px 8px rgba(0,0,0,.3);
+  --shadow-md:0 4px 16px rgba(0,0,0,.4);
+  --shadow-lg:0 8px 32px rgba(0,0,0,.5);
+  --glow:0 0 20px rgba(139,92,246,.3);
+}
+
+*{box-sizing:border-box;margin:0;padding:0;-webkit-tap-highlight-color:transparent;-webkit-font-smoothing:antialiased}
+html,body{height:100%;overscroll-behavior:none}
+body{
+  background:var(--bg-primary);
+  background-image:
+    radial-gradient(circle at 20% 50%, rgba(139,92,246,.1) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(6,182,212,.1) 0%, transparent 50%);
+  color:var(--text-primary);
+  font-family:'Inter',system-ui,sans-serif;
+  font-size:14px;
+  overflow-x:hidden;
+  padding-bottom:var(--nav-h);
+}
+
+/* ── WELCOME SCREEN ── */
+.welcome-screen{
+  position:fixed;top:0;left:0;right:0;bottom:0;
+  background:var(--bg-primary);
+  background-image:
+    radial-gradient(circle at 20% 50%, rgba(139,92,246,.15) 0%, transparent 50%),
+    radial-gradient(circle at 80% 80%, rgba(6,182,212,.15) 0%, transparent 50%);
+  display:flex;flex-direction:column;align-items:center;justify-content:center;
+  z-index:1000;opacity:1;transition:opacity .5s ease;
+}
+.welcome-screen.hide{opacity:0;pointer-events:none}
+.welcome-logo{
+  margin-bottom:24px;
+  display:flex;align-items:center;justify-content:center;
+}
+.welcome-title{
+  font-size:32px;font-weight:700;
+  background:var(--accent-gradient);
+  -webkit-background-clip:text;
+  -webkit-text-fill-color:transparent;
+  background-clip:text;
+  margin-bottom:12px;
+}
+.welcome-subtitle{
+  font-size:16px;color:var(--text-secondary);
+  margin-bottom:40px;
+}
+.welcome-btn{
+  padding:14px 40px;
+  background:var(--accent-gradient);
+  border:none;border-radius:30px;
+  color:white;font-size:16px;font-weight:600;
+  cursor:pointer;
+  box-shadow:0 8px 24px rgba(139,92,246,.3);
+  transition:all .3s ease;
+}
+.welcome-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 12px 32px rgba(139,92,246,.4);
+}
+
+/* ── SCREENS ── */
+.screen{display:none}
+.screen.active{display:block}
+.wrap{max-width:600px;margin:0 auto;padding:12px 12px 16px}
+
+/* ── NAV ── */
+.bottom-nav{
+  position:fixed;bottom:0;left:0;right:0;
+  height:var(--nav-h);
+  background:var(--bg-card);
+  backdrop-filter:blur(20px);
+  border-top:1px solid var(--border);
+  box-shadow:0 -4px 24px rgba(0,0,0,.4);
+  display:flex;z-index:100;
+}
+.nav-btn{
+  flex:1;display:flex;flex-direction:column;align-items:center;
+  justify-content:center;gap:4px;cursor:pointer;
+  border:none;background:none;padding:0;
+  color:var(--text-muted);transition:all .3s ease;
+  position:relative;
+}
+.nav-btn::before{
+  content:'';position:absolute;top:0;left:50%;transform:translateX(-50%);
+  width:0;height:3px;background:var(--accent-gradient);
+  border-radius:0 0 3px 3px;transition:width .3s ease;
+}
+.nav-btn.active{color:var(--accent-primary)}
+.nav-btn.active::before{width:60%}
+.nav-btn:hover{color:var(--accent-secondary)}
+.nav-btn svg{width:24px;height:24px;stroke-width:2}
+.nav-btn span{font-size:11px;font-weight:600;letter-spacing:.3px}
+
+/* ── HEADER ── */
+.page-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 0 12px;margin-bottom:12px;
+  border-bottom:1px solid var(--border);
+}
+.page-title{font-size:17px;font-weight:700;color:var(--text-primary)}
+.page-sub{font-size:11px;color:var(--text-muted);margin-top:1px}
+.live-badge{
+  display:flex;align-items:center;gap:5px;
+  font-size:10px;font-weight:600;color:#10b981;
+  background:rgba(76,217,100,.1);
+  border:1px solid rgba(76,217,100,.2);
+  border-radius:20px;padding:3px 9px;
+}
+.live-dot{width:5px;height:5px;border-radius:50%;background:#10b981;animation:pulse 2s infinite}
+@keyframes pulse{0%,100%{opacity:1;transform:scale(1)}50%{opacity:.5;transform:scale(.8)}}
+
+/* ── SEARCH ── */
+.search-row{display:flex;gap:8px;margin-bottom:10px}
+.search-field{
+  flex:1;display:flex;align-items:center;gap:8px;
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:var(--r);padding:0 12px;
+  transition:border-color .15s;
+}
+.search-field:focus-within{border-color:var(--accent-primary)}
+.search-field svg{width:16px;height:16px;stroke:var(--text-muted);flex-shrink:0}
+.search-field input{
+  flex:1;background:none;border:none;outline:none;
+  color:var(--text-primary);font-size:14px;font-family:'Inter',sans-serif;
+  padding:11px 0;
+}
+.search-field input::placeholder{color:var(--text-muted)}
+.btn-primary{
+  background:var(--accent-gradient);
+  color:#fff;
+  border:none;border-radius:var(--r2);
+  padding:0 20px;font-size:13px;font-weight:700;
+  cursor:pointer;white-space:nowrap;
+  transition:all .3s ease;
+  flex-shrink:0;
+  box-shadow:var(--shadow-sm);
+  position:relative;
+  overflow:hidden;
+}
+.btn-primary::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg, rgba(255,255,255,.2) 0%, transparent 100%);
+  opacity:0;transition:opacity .3s ease;
+}
+.btn-primary:hover{
+  box-shadow:var(--shadow-md), var(--glow);
+  transform:translateY(-2px);
+}
+.btn-primary:hover::before{opacity:1}
+.btn-primary:active{transform:translateY(0)}
+.btn-primary:disabled{opacity:.5;cursor:not-allowed;transform:none}
+
+/* suggest */
+.suggest-wrap{position:relative}
+.suggest-drop{
+  position:absolute;top:calc(100% + 4px);left:0;right:0;z-index:50;
+  background:var(--bg-secondary);border:1px solid var(--border);
+  border-radius:var(--r);overflow:hidden;
+  box-shadow:0 8px 24px rgba(0,0,0,.4);display:none;
+}
+.suggest-drop.open{display:block}
+.sug-item{
+  display:flex;align-items:center;gap:10px;
+  padding:9px 13px;cursor:pointer;
+  transition:background .12s;border-bottom:1px solid var(--border);
+}
+.sug-item:last-child{border-bottom:none}
+.sug-item:hover{background:rgba(255,255,255,.04)}
+.sug-av{width:30px;height:30px;border-radius:6px;object-fit:cover;background:var(--border);flex-shrink:0}
+.sug-name{font-size:13px;font-weight:500;color:var(--text-primary)}
+.sug-id{font-size:11px;color:var(--text-muted);margin-top:1px}
+
+/* picker */
+.picker-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden;margin-bottom:10px}
+.picker-head{padding:10px 14px;font-size:11px;font-weight:600;color:var(--text-secondary);letter-spacing:.5px;text-transform:uppercase;border-bottom:1px solid var(--border)}
+.picker-row{display:flex;align-items:center;gap:10px;padding:10px 14px;cursor:pointer;transition:background .12s;border-bottom:1px solid var(--border)}
+.picker-row:last-child{border-bottom:none}
+.picker-row:hover{background:rgba(255,255,255,.04)}
+.picker-av{width:36px;height:36px;border-radius:8px;object-fit:cover;background:var(--border);flex-shrink:0}
+.picker-name{font-size:14px;font-weight:600;color:var(--text-primary)}
+.picker-id{font-size:11px;color:var(--text-muted);margin-top:1px}
+
+/* error */
+.err-bar{
+  display:none;align-items:center;gap:8px;
+  background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.25);
+  border-radius:var(--r2);padding:10px 13px;margin-bottom:10px;
+  font-size:12px;color:#ff6b61;
+}
+.err-bar.show{display:flex}
+
+/* skeleton */
+.skel{display:none;margin-bottom:12px}
+.skel.show{display:block}
+.sk{background:linear-gradient(90deg,var(--bg-card) 25%,var(--bg-secondary) 50%,var(--bg-card) 75%);background-size:200% 100%;animation:sk 1.3s infinite;border-radius:var(--r2)}
+@keyframes sk{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.sk-row{display:flex;gap:12px;background:var(--bg-card);border-radius:var(--r);padding:14px;margin-bottom:8px}
+.sk-av{width:48px;height:48px;flex-shrink:0;border-radius:10px}
+.sk-lines{flex:1;display:flex;flex-direction:column;gap:7px;padding-top:2px}
+.sk-line{height:10px;border-radius:3px}
+.sk-g{display:grid;grid-template-columns:repeat(3,1fr);gap:8px}
+.sk-box{height:64px;border-radius:var(--r)}
+
+/* ── PROFILE CARD ── */
+.profile-card{
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  overflow:hidden;
+  margin-bottom:12px;
+  box-shadow:var(--shadow-md);
+  transition:all .3s ease;
+}
+.profile-card:hover{
+  box-shadow:var(--shadow-lg), var(--glow);
+  transform:translateY(-2px);
+}
+.profile-cover{
+  height:80px;
+  background:var(--accent-gradient);
+  position:relative;
+  overflow:hidden;
+}
+.profile-cover::before{
+  content:'';position:absolute;inset:0;
+  background:url('data:image/svg+xml,<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 120"><path d="M0,0 Q300,60 600,30 T1200,0 L1200,120 L0,120 Z" fill="rgba(0,0,0,.2)"/></svg>') no-repeat bottom;
+  background-size:cover;
+}
+.profile-cover::after{
+  content:'';position:absolute;bottom:0;left:0;right:0;height:2px;
+  background:linear-gradient(90deg,var(--accent-primary),var(--accent-secondary),var(--accent-primary));
+  background-size:200% 100%;
+  animation:shimmer 3s linear infinite;
+}
+@keyframes shimmer{0%{background-position:200% 0}100%{background-position:-200% 0}}
+.profile-body{padding:0 14px 14px;display:flex;gap:12px;align-items:flex-end;margin-top:-22px}
+.profile-av{
+  width:48px;height:48px;border-radius:10px;
+  border:2px solid var(--bg-primary);object-fit:cover;
+  background:var(--border);flex-shrink:0;position:relative;z-index:1;
+}
+.profile-info{flex:1;min-width:0;padding-top:24px}
+.profile-name{font-size:17px;font-weight:700;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.profile-tags{display:flex;gap:5px;flex-wrap:wrap;margin-top:4px}
+.tag{
+  font-size:10px;font-weight:600;letter-spacing:.3px;
+  padding:2px 7px;border-radius:20px;
+}
+.tag-blue{background:rgba(36,129,204,.2);color:var(--accent-secondary);border:1px solid rgba(36,129,204,.3)}
+.tag-green{background:rgba(76,217,100,.15);color:#10b981;border:1px solid rgba(76,217,100,.25)}
+.tag-muted{background:rgba(255,255,255,.06);color:var(--text-secondary);border:1px solid var(--border)}
+.profile-right{flex-shrink:0;display:flex;flex-direction:column;gap:4px;padding-top:24px;align-items:flex-end}
+.rank-box{
+  background:rgba(255,255,255,.06);border:1px solid var(--border);
+  border-radius:var(--r2);padding:5px 10px;text-align:center;min-width:68px;
+}
+.rank-em{font-size:18px;line-height:1}
+.rank-name{font-size:10px;font-weight:600;color:var(--text-secondary);margin-top:2px;white-space:nowrap}
+.mmr-box{
+  background:rgba(255,214,10,.08);border:1px solid rgba(255,214,10,.2);
+  border-radius:var(--r2);padding:3px 10px;text-align:center;min-width:68px;
+}
+.mmr-val{font-size:13px;font-weight:700;color:#fbbf24}
+.mmr-lbl{font-size:9px;color:var(--text-muted);margin-top:1px}
+
+/* ── TABS (inner) ── */
+.tab-bar{
+  display:flex;background:var(--bg-card);
+  border:1px solid var(--border);border-radius:var(--r);
+  padding:3px;gap:2px;margin-bottom:12px;
+}
+.tab-btn{
+  flex:1;padding:7px 4px;text-align:center;
+  font-size:12px;font-weight:600;color:var(--text-muted);
+  border:none;background:none;border-radius:var(--r2);
+  cursor:pointer;transition:all .15s;white-space:nowrap;
+}
+.tab-btn.active{background:var(--accent-primary);color:#fff}
+.tab-panel{display:none}
+.tab-panel.active{display:block}
+
+/* ── SECTION LABEL ── */
+.section-lbl{
+  font-size:11px;font-weight:600;color:var(--text-muted);
+  letter-spacing:.5px;text-transform:uppercase;
+  margin-bottom:8px;display:flex;align-items:center;gap:8px;
+}
+.section-lbl::after{content:'';flex:1;height:1px;background:var(--border)}
+
+/* ── WR CARD ── */
+.wr-card{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:var(--r);padding:14px;margin-bottom:10px;
+}
+.wr-top{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:14px}
+.wr-big{font-size:48px;font-weight:700;line-height:1;letter-spacing:-1px}
+.wr-big.good{color:#10b981}.wr-big.ok{color:#fbbf24}.wr-big.bad{color:#ef4444}
+.wr-label{font-size:11px;color:var(--text-muted);margin-top:4px}
+.wr-wl{text-align:right}
+.wr-w{font-size:16px;font-weight:700;color:#10b981}
+.wr-l{font-size:16px;font-weight:700;color:#ef4444}
+.wr-total{font-size:11px;color:var(--text-muted);margin-top:2px}
+.wr-dots{display:flex;gap:3px;flex-wrap:wrap;margin-bottom:10px}
+.dot{
+  width:20px;height:20px;border-radius:4px;
+  display:flex;align-items:center;justify-content:center;
+  font-size:8px;font-weight:700;
+}
+.dot.w{background:rgba(76,217,100,.15);color:#10b981;border:1px solid rgba(76,217,100,.25)}
+.dot.l{background:rgba(255,59,48,.1);color:#ef4444;border:1px solid rgba(255,59,48,.2)}
+.wr-bar{height:4px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden}
+.wr-bar-fill{height:100%;border-radius:2px;transition:width 1s ease}
+.wr-bar-fill.good{background:#10b981}.wr-bar-fill.ok{background:#fbbf24}.wr-bar-fill.bad{background:#ef4444}
+
+/* streak */
+.streak{
+  display:inline-flex;align-items:center;gap:6px;
+  padding:5px 12px;border-radius:20px;
+  font-size:12px;font-weight:700;margin-bottom:10px;
+}
+.streak.win{background:rgba(76,217,100,.1);border:1px solid rgba(76,217,100,.2);color:#10b981}
+.streak.loss{background:rgba(255,59,48,.1);border:1px solid rgba(255,59,48,.2);color:#ef4444}
+
+/* trends */
+.trend-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;margin-bottom:10px}
+.trend-box{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:12px}
+.trend-head{font-size:11px;font-weight:600;color:var(--text-muted);margin-bottom:8px;padding-bottom:6px;border-bottom:1px solid var(--border)}
+.trend-row{display:flex;justify-content:space-between;align-items:center;margin-bottom:4px}
+.trend-row:last-child{margin-bottom:0}
+.trend-key{font-size:12px;color:var(--text-secondary)}
+.trend-val{font-size:14px;font-weight:700;color:var(--text-primary)}
+.trend-val.good{color:#10b981}.trend-val.ok{color:#fbbf24}.trend-val.bad{color:#ef4444}
+
+/* stats grid */
+.stats-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:10px}
+.stat-box{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:var(--r);padding:10px 6px;text-align:center;
+}
+.stat-num{font-size:22px;font-weight:700;line-height:1;color:var(--text-primary)}
+.stat-num.g{color:#10b981}.stat-num.r{color:#ef4444}.stat-num.au{color:#fbbf24}
+.stat-num.b{color:#5ac8fa}.stat-num.p{color:var(--purple)}
+.stat-lbl{font-size:9px;font-weight:600;color:var(--text-muted);margin-top:4px;text-transform:uppercase;letter-spacing:.5px}
+
+/* chart */
+.chart-card{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);padding:13px;margin-bottom:10px}
+.chart-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:10px}
+.chart-title{font-size:12px;font-weight:600;color:var(--text-secondary);text-transform:uppercase;letter-spacing:.5px}
+.chart-leg{display:flex;gap:10px}
+.leg{display:flex;align-items:center;gap:4px;font-size:10px;color:var(--text-muted)}
+.leg-dot{width:8px;height:3px;border-radius:2px}
+.chart-wrap{height:120px;position:relative}
+
+/* heroes */
+.hero-list{display:flex;flex-direction:column;gap:6px}
+.hero-row{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:var(--r);padding:8px 12px;
+  display:flex;align-items:center;gap:10px;
+  transition:background .12s;
+}
+.hero-row:active{background:var(--bg-secondary)}
+.hero-n{font-size:10px;font-weight:600;color:var(--text-muted);width:14px;text-align:center;flex-shrink:0}
+.hero-img{width:54px;height:30px;border-radius:5px;object-fit:cover;background:var(--border);flex-shrink:0}
+.hero-name{flex:1;font-size:13px;font-weight:600;color:var(--text-primary);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.hero-meta{display:flex;flex-direction:column;align-items:flex-end;gap:2px}
+.hero-games{font-size:10px;color:var(--text-muted)}
+.hero-kda{font-size:10px;color:var(--text-secondary)}
+.hero-bar-wrap{width:36px;height:3px;background:rgba(255,255,255,.07);border-radius:2px;overflow:hidden;flex-shrink:0}
+.hero-bar-fill{height:100%;border-radius:2px;transition:width .6s ease}
+.hero-wr{font-size:15px;font-weight:700;min-width:38px;text-align:right}
+.hero-wr.good{color:#10b981}.hero-wr.ok{color:#fbbf24}.hero-wr.bad{color:#ef4444}
+
+/* matches */
+.match-list{display:flex;flex-direction:column;gap:5px}
+.match-card{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:var(--r);overflow:hidden;cursor:pointer;
+}
+.match-main{
+  padding:9px 12px;display:grid;
+  grid-template-columns:42px 1fr auto auto;
+  align-items:center;gap:9px;position:relative;
+}
+.match-main::before{content:'';position:absolute;left:0;top:0;bottom:0;width:3px}
+.match-card.win .match-main::before{background:#10b981}
+.match-card.loss .match-main::before{background:#ef4444}
+.match-himg{width:42px;height:24px;border-radius:4px;object-fit:cover;background:var(--border);display:block;flex-shrink:0}
+.match-kda{font-size:11px;color:var(--text-secondary);font-variant-numeric:tabular-nums}
+.match-hero{font-size:10px;color:var(--text-muted);margin-top:2px}
+.match-dur{font-size:9px;color:var(--text-muted);margin-top:1px}
+.match-kda-big{font-size:18px;font-weight:700;text-align:center}
+.match-kda-big.good{color:#10b981}.match-kda-big.ok{color:#fbbf24}.match-kda-big.bad{color:#ef4444}
+.match-pill{font-size:11px;font-weight:700;padding:3px 9px;border-radius:6px;letter-spacing:.3px}
+.match-pill.win{background:rgba(76,217,100,.12);color:#10b981;border:1px solid rgba(76,217,100,.2)}
+.match-pill.loss{background:rgba(255,59,48,.1);color:#ef4444;border:1px solid rgba(255,59,48,.18)}
+.match-chevron{font-size:10px;color:var(--text-muted);transition:transform .2s;line-height:1}
+.match-card.open .match-chevron{transform:rotate(180deg)}
+.match-expand{display:none;border-top:1px solid var(--border);padding:10px 12px;background:rgba(0,0,0,.2)}
+.match-card.open .match-expand{display:block}
+.mex-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:6px;margin-bottom:8px}
+.mex-cell{text-align:center}
+.mex-val{font-size:14px;font-weight:700;color:var(--text-primary)}
+.mex-val.g{color:#10b981}.mex-val.r{color:#ef4444}.mex-val.au{color:#fbbf24}.mex-val.b{color:#5ac8fa}.mex-val.p{color:var(--purple)}
+.mex-lbl{font-size:9px;color:var(--text-muted);text-transform:uppercase;letter-spacing:.5px;margin-top:2px}
+.match-links{display:grid;grid-template-columns:1fr 1fr;gap:6px}
+.ext-link{
+  display:block;text-align:center;font-size:11px;font-weight:500;
+  color:var(--accent-secondary);padding:7px;
+  border:1px solid rgba(36,129,204,.2);border-radius:var(--r2);
+  text-decoration:none;transition:background .15s;
+}
+.ext-link:hover{background:rgba(36,129,204,.08)}
+
+/* ── AI ── */
+.ai-wrap{display:flex;flex-direction:column;gap:8px}
+.ai-quick{display:grid;grid-template-columns:1fr 1fr;gap:7px;margin-bottom:4px}
+.ai-q-btn{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:var(--r);padding:11px 10px;
+  cursor:pointer;text-align:left;transition:border-color .15s,background .15s;
+  display:flex;align-items:flex-start;gap:8px;
+}
+.ai-q-btn:hover{border-color:var(--accent-primary);background:rgba(36,129,204,.06)}
+.ai-q-btn:active{transform:scale(.97)}
+.ai-q-icon{font-size:18px;line-height:1;flex-shrink:0}
+.ai-q-title{font-size:12px;font-weight:600;color:var(--text-primary)}
+.ai-q-desc{font-size:10px;color:var(--text-muted);margin-top:2px}
+.ai-chat{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--r);overflow:hidden}
+.ai-msgs{min-height:100px;max-height:320px;overflow-y:auto;padding:12px;display:flex;flex-direction:column;gap:8px}
+.ai-msg{display:flex;gap:8px;align-items:flex-start}
+.ai-msg.user{flex-direction:row-reverse}
+.ai-bubble{padding:8px 12px;border-radius:10px;font-size:13px;line-height:1.5;max-width:88%}
+.ai-msg.bot .ai-bubble{background:var(--bg-secondary);border:1px solid var(--border);border-radius:10px 10px 10px 2px;color:var(--text-primary)}
+.ai-msg.user .ai-bubble{background:var(--accent-primary);color:#fff;border-radius:10px 10px 2px 10px}
+.ai-avatar{width:26px;height:26px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:13px;flex-shrink:0;margin-top:2px}
+.ai-msg.bot .ai-avatar{background:rgba(36,129,204,.15);border:1px solid rgba(36,129,204,.25)}
+.ai-msg.user .ai-avatar{background:rgba(255,255,255,.12)}
+.ai-typing{display:none;align-items:center;gap:4px;padding:6px 12px}
+.ai-typing.on{display:flex}
+.ai-typing i{width:6px;height:6px;background:var(--text-muted);border-radius:50%;animation:tp .8s ease-in-out infinite}
+.ai-typing i:nth-child(2){animation-delay:.15s}
+.ai-typing i:nth-child(3){animation-delay:.3s}
+@keyframes tp{0%,80%,100%{transform:scale(.7);opacity:.4}40%{transform:scale(1);opacity:1}}
+.ai-input-row{display:flex;gap:8px;padding:9px 10px;border-top:1px solid var(--border);background:rgba(0,0,0,.15)}
+.ai-input{
+  flex:1;background:var(--bg-secondary);border:1px solid var(--border);
+  border-radius:var(--r2);padding:8px 12px;
+  color:var(--text-primary);font-size:13px;font-family:'Inter',sans-serif;
+  outline:none;transition:border-color .15s;
+}
+.ai-input:focus{border-color:var(--accent-primary)}
+.ai-input::placeholder{color:var(--text-muted)}
+.ai-send{
+  background:var(--accent-primary);border:none;border-radius:var(--r2);
+  width:36px;height:36px;display:flex;align-items:center;justify-content:center;
+  cursor:pointer;flex-shrink:0;transition:background .15s;
+}
+.ai-send:hover{background:var(--accent-secondary)}
+.ai-send:disabled{opacity:.35;cursor:not-allowed}
+.ai-send svg{width:16px;height:16px;stroke:#fff;fill:none}
+
+/* ── MISSIONS ── */
+.mission-card{
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  padding:16px;
+  margin-bottom:10px;
+  transition:all .3s ease;
+  position:relative;
+  overflow:hidden;
+  box-shadow:var(--shadow-sm);
+}
+.mission-card::before{
+  content:'';position:absolute;top:0;left:0;right:0;height:4px;
+  background:var(--accent-gradient);
+  transform:scaleX(0);transform-origin:left;
+  transition:transform .6s cubic-bezier(0.4, 0.0, 0.2, 1);
+}
+.mission-card:hover{
+  transform:translateY(-3px);
+  box-shadow:var(--shadow-md), var(--glow);
+  border-color:var(--accent-primary);
+}
+.mission-card.done{
+  border-color:var(--success);
+  background:linear-gradient(135deg,var(--bg-card) 0%,rgba(16,185,129,.08) 100%);
+}
+.mission-card.done::before{
+  background:linear-gradient(90deg,var(--success),#34d399);
+  transform:scaleX(1);
+}
+.mission-card.done:hover{
+  box-shadow:var(--shadow-md), 0 0 20px rgba(16,185,129,.3);
+}
+.mission-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.mission-icon{font-size:22px;flex-shrink:0}
+.mission-title{font-size:14px;font-weight:600;color:var(--text-primary)}
+.mission-desc{font-size:11px;color:var(--text-muted);margin-top:2px}
+.mission-reward{margin-left:auto;text-align:right;flex-shrink:0}
+.mission-coins{font-size:13px;font-weight:700;color:#fbbf24}
+.mission-xp{font-size:10px;color:var(--text-muted);margin-top:1px}
+.mission-bar-bg{height:6px;background:rgba(255,255,255,.05);border-radius:3px;overflow:hidden;margin-bottom:6px;position:relative}
+.mission-bar-bg::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.1),transparent);
+  animation:pulse 2s ease-in-out infinite;
+}
+@keyframes pulse{0%,100%{opacity:.5}50%{opacity:1}}
+.mission-bar-fill{
+  height:100%;border-radius:3px;
+  transition:width .8s cubic-bezier(0.4, 0.0, 0.2, 1);
+  background:var(--accent-gradient);
+  position:relative;
+  box-shadow:0 0 10px rgba(139,92,246,.5);
+}
+.mission-bar-fill::after{
+  content:'';position:absolute;top:0;left:0;right:0;bottom:0;
+  background:linear-gradient(90deg,transparent,rgba(255,255,255,.4),transparent);
+  animation:shimmer 2s infinite;
+}
+@keyframes shimmer{0%{transform:translateX(-100%)}100%{transform:translateX(100%)}}
+.mission-progress{display:flex;justify-content:space-between;font-size:10px;color:var(--text-muted)}
+.claim-btn{
+  width:100%;margin-top:12px;
+  background:linear-gradient(135deg,var(--success),#34d399);
+  border:none;border-radius:var(--r2);padding:12px;
+  color:#fff;font-size:14px;font-weight:700;
+  cursor:pointer;letter-spacing:.5px;
+  transition:all .3s ease;
+  box-shadow:0 4px 12px rgba(16,185,129,.4);
+  position:relative;
+  overflow:hidden;
+}
+.claim-btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg, rgba(255,255,255,.3) 0%, transparent 100%);
+  opacity:0;transition:opacity .3s ease;
+}
+.claim-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:0 6px 20px rgba(16,185,129,.6);
+}
+.claim-btn:hover::before{opacity:1}
+.claim-btn:active{transform:translateY(0)}
+.type-badge{
+  display:inline-block;font-size:10px;font-weight:600;
+  color:var(--text-muted);padding:3px 8px;
+  border:1px solid var(--border);border-radius:20px;
+  margin-bottom:8px;text-transform:uppercase;letter-spacing:.5px;
+  background:rgba(255,255,255,.03);
+  transition:all .3s ease;
+}
+.type-badge:hover{
+  background:rgba(255,255,255,.06);
+  border-color:var(--accent-primary);
+  color:var(--accent-secondary);
+}
+
+/* ── SHOP ── */
+.shop-item{
+  background:var(--bg-card);
+  border:1px solid var(--border);
+  border-radius:var(--r);
+  padding:16px;
+  margin-bottom:10px;
+  transition:all .3s ease;
+  position:relative;
+  box-shadow:var(--shadow-sm);
+}
+.shop-item.premium-item{
+  border-color:rgba(139,92,246,.5);
+  background:linear-gradient(135deg,var(--bg-card) 0%,rgba(139,92,246,.08) 100%);
+  box-shadow:var(--shadow-sm),0 0 20px rgba(139,92,246,.15);
+}
+.premium-btn{
+  background:linear-gradient(135deg,#8b5cf6,#06b6d4) !important;
+  box-shadow:0 4px 16px rgba(139,92,246,.4) !important;
+}
+.shop-item::before{
+  content:'';position:absolute;inset:0;
+  background:var(--accent-gradient);
+  opacity:0;
+  border-radius:var(--r);
+  transition:opacity .3s ease;
+  z-index:0;
+}
+.shop-item:hover{
+  transform:translateY(-3px);
+  border-color:var(--accent-primary);
+  box-shadow:var(--shadow-md), var(--glow);
+}
+.shop-item:hover::before{opacity:.05}
+.shop-item > *{position:relative;z-index:1}
+.shop-top{display:flex;align-items:center;gap:10px;margin-bottom:10px}
+.shop-icon{font-size:26px;flex-shrink:0}
+.shop-name{font-size:14px;font-weight:600;color:var(--text-primary)}
+.shop-desc{font-size:11px;color:var(--text-muted);margin-top:2px}
+.shop-price{margin-left:auto;font-size:18px;font-weight:700;color:#fbbf24;white-space:nowrap}
+.buy-btn{
+  width:100%;
+  background:var(--accent-gradient);
+  border:none;border-radius:var(--r2);padding:12px;
+  color:#fff;font-size:14px;font-weight:700;
+  cursor:pointer;
+  transition:all .3s ease;
+  box-shadow:var(--shadow-sm);
+  position:relative;
+  overflow:hidden;
+}
+.buy-btn::before{
+  content:'';position:absolute;inset:0;
+  background:linear-gradient(135deg, rgba(255,255,255,.2) 0%, transparent 100%);
+  opacity:0;transition:opacity .3s ease;
+}
+.buy-btn:hover{
+  transform:translateY(-2px);
+  box-shadow:var(--shadow-md), var(--glow);
+}
+.buy-btn:hover::before{opacity:1}
+.buy-btn:active{transform:translateY(0)}
+.buy-btn:disabled{
+  opacity:.4;cursor:not-allowed;
+  background:var(--bg-secondary);
+  color:var(--text-muted);
+  transform:none;box-shadow:none;
+}
+
+/* ── SCREEN HEADERS ── */
+.scr-hdr{
+  display:flex;align-items:center;justify-content:space-between;
+  padding:14px 0 12px;margin-bottom:12px;
+  border-bottom:1px solid var(--border);
+}
+.scr-hdr h2{font-size:17px;font-weight:700;color:var(--text-primary)}
+.balance-badge{
+  display:flex;align-items:center;gap:5px;
+  font-size:14px;font-weight:700;color:#fbbf24;
+  background:rgba(255,214,10,.08);border:1px solid rgba(255,214,10,.2);
+  border-radius:20px;padding:4px 10px;
+  transition:all .3s ease;
+}
+.balance-badge:hover{
+  background:rgba(255,214,10,.15);
+  transform:scale(1.05);
+}
+
+/* user mini card */
+.user-mini{
+  background:var(--bg-card);border:1px solid var(--border);
+  border-radius:var(--r);padding:12px 14px;margin-bottom:12px;
+  display:flex;align-items:center;gap:10px;
+}
+.user-av{width:36px;height:36px;border-radius:8px;background:var(--accent-primary);display:flex;align-items:center;justify-content:center;font-size:16px;flex-shrink:0}
+.user-name{font-size:14px;font-weight:600;color:var(--text-primary)}
+.user-sub{font-size:10px;color:var(--text-muted);margin-top:2px}
+.user-coins{margin-left:auto;font-size:14px;font-weight:700;color:#fbbf24}
+
+/* empty state */
+.empty{text-align:center;padding:40px 20px;color:var(--text-muted)}
+.empty-icon{font-size:40px;margin-bottom:12px;display:block;opacity:.6}
+.empty-text{font-size:13px;line-height:1.6}
+
+/* animations */
+@keyframes fadeUp{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:translateY(0)}}
+.fu{animation:fadeUp .25s ease both}
+
+@media(max-width:380px){
+  .stats-grid .stat-num{font-size:18px}
+  .wr-big{font-size:40px}
+  .tab-btn{font-size:11px;padding:6px 2px}
+}
+
+/* ── PREMIUM BANNER ── */
+.premium-banner{
+  background:linear-gradient(135deg,rgba(139,92,246,.25) 0%,rgba(6,182,212,.2) 100%);
+  border:1px solid rgba(139,92,246,.5);
+  border-radius:var(--r);padding:16px;margin-bottom:14px;
+  position:relative;overflow:hidden;
+}
+.premium-banner::before{
+  content:'';position:absolute;top:-40px;right:-40px;
+  width:120px;height:120px;border-radius:50%;
+  background:radial-gradient(circle,rgba(139,92,246,.3),transparent 70%);
+}
+.premium-banner-title{font-size:16px;font-weight:700;color:#fff;margin-bottom:4px}
+.premium-banner-sub{font-size:12px;color:var(--text-secondary);margin-bottom:12px}
+.premium-features{display:flex;flex-direction:column;gap:5px;margin-bottom:14px}
+.premium-feat{font-size:12px;color:var(--text-primary);display:flex;align-items:center;gap:6px}
+.premium-feat::before{content:'✓';color:#10b981;font-weight:700;flex-shrink:0}
+.premium-buy-btn{
+  width:100%;padding:12px;
+  background:linear-gradient(135deg,#8b5cf6,#06b6d4);
+  border:none;border-radius:var(--r2);
+  color:#fff;font-size:14px;font-weight:700;
+  cursor:pointer;letter-spacing:.3px;
+  box-shadow:0 4px 16px rgba(139,92,246,.4);
+  transition:all .3s ease;
+}
+.premium-buy-btn:hover{transform:translateY(-2px);box-shadow:0 6px 24px rgba(139,92,246,.5);}
+.premium-buy-btn:active{transform:translateY(0);}
+.premium-active-badge{
+  display:inline-flex;align-items:center;gap:6px;
+  background:linear-gradient(135deg,rgba(139,92,246,.3),rgba(6,182,212,.3));
+  border:1px solid rgba(139,92,246,.5);
+  border-radius:20px;padding:6px 14px;
+  font-size:12px;font-weight:600;color:#fff;
+  margin-bottom:14px;
+}
+
+/* ── SHOP PREMIUM ITEM ── */
+.shop-item.premium-item{
+  border-color:rgba(139,92,246,.5);
+  background:linear-gradient(135deg,var(--bg-card) 0%,rgba(139,92,246,.08) 100%);
+  box-shadow:var(--shadow-sm),0 0 20px rgba(139,92,246,.15);
+}
+.premium-btn{
+  background:linear-gradient(135deg,#8b5cf6,#06b6d4) !important;
+  box-shadow:0 4px 16px rgba(139,92,246,.4) !important;
+}
+</style>
+</head>
+<body>
+
+<!-- WELCOME SCREEN -->
+<div class="welcome-screen" id="welcomeScreen">
+  <div class="welcome-logo" id="welcomeLogoWrap">
+    <img src="logo.png" alt="Dota 2 Analyzer" id="welcomeLogoImg"
+      onerror="this.style.display='none';document.getElementById('welcomeLogoFallback').style.display='flex'"
+      style="width:150px;height:150px;border-radius:50%;object-fit:cover;display:block;box-shadow:0 0 30px rgba(139,92,246,.3), 0 0 60px rgba(6,182,212,.15);">
+    <div id="welcomeLogoFallback" style="display:none;width:150px;height:150px;border-radius:50%;background:linear-gradient(135deg,#8b5cf6,#06b6d4);align-items:center;justify-content:center;font-size:64px;box-shadow:0 0 30px rgba(139,92,246,.3),0 0 60px rgba(6,182,212,.15);">⚔️</div>
+  </div>
+  <div class="welcome-title">Dota 2 Analyzer</div>
+  <div class="welcome-subtitle">Анализ игроков · Миссии · AI помощник</div>
+  <button class="welcome-btn" onclick="hideWelcome()">Начать</button>
+</div>
+
+<!-- SCREEN: SEARCH -->
+<div class="screen active" id="screen-search">
+<div class="wrap">
+  <div class="page-hdr">
+    <div>
+      <div class="page-title">⚔️ Dota 2 Analyzer</div>
+      <div class="page-sub">stratz · opendota · ai</div>
+    </div>
+    <div class="live-badge"><div class="live-dot"></div>LIVE</div>
+  </div>
+
+  <div class="suggest-wrap">
+    <div class="search-row">
+      <div class="search-field">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+        <input id="si" type="text" placeholder="Ник или Steam ID..." autocomplete="off" spellcheck="false"/>
+      </div>
+      <button class="btn-primary" id="sb" onclick="doSearch()">Найти</button>
+    </div>
+    <div class="suggest-drop" id="sugDrop"></div>
+  </div>
+
+  <div id="pickerBlock"></div>
+  <div class="err-bar" id="errBar">
+    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
+    <span id="errMsg"></span>
+  </div>
+
+  <div class="skel" id="skel">
+    <div class="sk-row"><div class="sk sk-av"></div><div class="sk-lines"><div class="sk sk-line" style="width:60%"></div><div class="sk sk-line" style="width:36%"></div></div></div>
+    <div class="sk-g"><div class="sk sk-box"></div><div class="sk sk-box"></div><div class="sk sk-box"></div></div>
+  </div>
+
+  <div id="results"></div>
+</div>
+</div>
+
+<!-- SCREEN: MISSIONS -->
+<div class="screen" id="screen-missions">
+<div class="wrap">
+  <div class="scr-hdr">
+    <h2>🎯 Миссии</h2>
+    <div style="display:flex;gap:8px;align-items:center">
+      <div class="balance-badge" id="premiumBadge" style="font-size:11px;padding:4px 10px">🆓 Free</div>
+      <div class="balance-badge" id="mCoins">💰 0</div>
+    </div>
+  </div>
+  <div id="mUserBlock"></div>
+
+  <!-- Premium banner -->
+  <div id="premiumBanner" style="display:none"></div>
+
+  <!-- Тестовая панель (скрыта в Telegram, видна в браузере) -->
+  <div id="testPanel" style="display:none;background:rgba(139,92,246,.1);border:1px solid rgba(139,92,246,.3);border-radius:12px;padding:14px;margin-bottom:12px;">
+    <div style="font-size:12px;font-weight:600;color:var(--accent-secondary);margin-bottom:8px;">🧪 Тестовый режим (вне Telegram)</div>
+    <div style="font-size:11px;color:var(--text-muted);margin-bottom:10px;">Введи свой Telegram ID чтобы получать награды:</div>
+    <div style="display:flex;gap:8px;">
+      <input id="testIdInput" type="number" placeholder="Telegram ID (например: 123456789)"
+        style="flex:1;background:var(--bg-primary);border:1px solid var(--border);border-radius:8px;padding:8px 10px;color:var(--text-primary);font-size:13px;outline:none;"/>
+      <button onclick="setTestId()" style="background:var(--accent-gradient);border:none;border-radius:8px;padding:8px 14px;color:#fff;font-size:13px;font-weight:600;cursor:pointer;white-space:nowrap;">Сохранить</button>
+    </div>
+  </div>
+
+  <div id="mList"><div class="empty"><span class="empty-icon">🔍</span><div class="empty-text">Сначала найди игрока<br>на вкладке Поиск</div></div></div>
+</div>
+</div>
+
+<!-- SCREEN: SHOP -->
+<div class="screen" id="screen-shop">
+<div class="wrap">
+  <div class="scr-hdr">
+    <h2>🛒 Магазин</h2>
+    <div class="balance-badge" id="sCoins">💰 0</div>
+  </div>
+  <div id="sUserBlock"></div>
+  <div id="sItems"><div class="empty"><span class="empty-icon">⏳</span><div class="empty-text">Загрузка...</div></div></div>
+</div>
+</div>
+
+<!-- NAV -->
+<nav class="bottom-nav">
+  <button class="nav-btn active" id="nav-search" onclick="goScreen('search')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><circle cx="11" cy="11" r="8"/><path d="m21 21-4.35-4.35"/></svg>
+    <span>Поиск</span>
+  </button>
+  <button class="nav-btn" id="nav-missions" onclick="goScreen('missions')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/></svg>
+    <span>Миссии</span>
+  </button>
+  <button class="nav-btn" id="nav-shop" onclick="goScreen('shop')">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4z"/><line x1="3" y1="6" x2="21" y2="6"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
+    <span>Магазин</span>
+  </button>
+</nav>
+
+<script>
+// ── CONFIG ──────────────────────────────────────
+const API = "https://dota2-analyzer-production.up.railway.app";
+
+let tg = null;
+let TG_INIT_DATA = "";   // initData (signed) для X-Telegram-Init-Data
+try{
+  tg = window.Telegram?.WebApp;
+  if(tg){
+    tg.ready();
+    tg.expand();
+    tg.setHeaderColor?.('#17212b');
+    TG_INIT_DATA = tg.initData || "";
+    console.log('✅ Telegram Web App initialized');
+    console.log('User ID:', tg.initDataUnsafe?.user?.id);
+    console.log('initData length:', TG_INIT_DATA.length);
+  }else{
+    console.warn('⚠️ Telegram Web App not available');
+  }
+}catch(e){
+  console.error('❌ Telegram Web App error:', e);
+}
+
+// Универсальный fetch с прокидыванием initData
+async function apiFetch(path, opts={}){
+  const headers = Object.assign({}, opts.headers || {});
+  if(TG_INIT_DATA){
+    headers['X-Telegram-Init-Data'] = TG_INIT_DATA;
+  }
+  if(opts.body && !headers['Content-Type']){
+    headers['Content-Type'] = 'application/json';
+  }
+  return fetch(`${API}${path}`, Object.assign({}, opts, { headers }));
+}
+
+let playerData = null, currentUser = null, aiHistory = [], chartInst = null;
+
+// ── HERO MAPS ────────────────────────────────────
+const HS={1:"antimage",2:"axe",3:"bane",4:"bloodseeker",5:"crystal_maiden",6:"drow_ranger",7:"earthshaker",8:"juggernaut",9:"mirana",10:"morphling",11:"nevermore",12:"phantom_lancer",13:"puck",14:"pudge",15:"razor",16:"sand_king",17:"storm_spirit",18:"sven",19:"tiny",20:"vengefulspirit",21:"windrunner",22:"zuus",23:"kunkka",25:"lina",26:"lion",27:"shadow_shaman",28:"slardar",29:"tidehunter",30:"witch_doctor",31:"lich",32:"riki",33:"enigma",34:"tinker",35:"sniper",36:"necrolyte",37:"warlock",38:"beastmaster",39:"queenofpain",40:"venomancer",41:"faceless_void",42:"skeleton_king",43:"death_prophet",44:"phantom_assassin",45:"pugna",46:"templar_assassin",47:"viper",48:"luna",49:"dragon_knight",50:"dazzle",51:"rattletrap",52:"leshrac",53:"furion",54:"life_stealer",55:"dark_seer",56:"clinkz",57:"omniknight",58:"enchantress",59:"huskar",60:"night_stalker",61:"broodmother",62:"bounty_hunter",63:"weaver",64:"jakiro",65:"batrider",66:"chen",67:"spectre",68:"ancient_apparition",69:"doom_bringer",70:"ursa",71:"spirit_breaker",72:"gyrocopter",73:"alchemist",74:"invoker",75:"silencer",76:"obsidian_destroyer",77:"lycan",78:"brewmaster",79:"shadow_demon",80:"lone_druid",81:"chaos_knight",82:"meepo",83:"treant",84:"ogre_magi",85:"undying",86:"rubick",87:"disruptor",88:"nyx_assassin",89:"naga_siren",90:"keeper_of_the_light",91:"wisp",92:"visage",93:"slark",94:"medusa",95:"troll_warlord",96:"centaur",97:"magnataur",98:"shredder",99:"bristleback",100:"tusk",101:"skywrath_mage",102:"abaddon",103:"elder_titan",104:"legion_commander",106:"ember_spirit",107:"earth_spirit",109:"terrorblade",110:"phoenix",111:"oracle",112:"winter_wyvern",113:"arc_warden",120:"pangolier",121:"dark_willow",123:"grimstroke",126:"void_spirit",128:"snapfire",129:"mars",135:"dawnbreaker",136:"marci",137:"primal_beast",138:"muerta"};
+const HN={1:"Anti-Mage",2:"Axe",3:"Bane",4:"Bloodseeker",5:"Crystal Maiden",6:"Drow Ranger",7:"Earthshaker",8:"Juggernaut",9:"Mirana",10:"Morphling",11:"Shadow Fiend",12:"Phantom Lancer",13:"Puck",14:"Pudge",15:"Razor",16:"Sand King",17:"Storm Spirit",18:"Sven",19:"Tiny",20:"Vengeful Spirit",21:"Windranger",22:"Zeus",23:"Kunkka",25:"Lina",26:"Lion",27:"Shadow Shaman",28:"Slardar",29:"Tidehunter",30:"Witch Doctor",31:"Lich",32:"Riki",33:"Enigma",34:"Tinker",35:"Sniper",36:"Necrophos",37:"Warlock",38:"Beastmaster",39:"Queen of Pain",40:"Venomancer",41:"Faceless Void",42:"Wraith King",43:"Death Prophet",44:"Phantom Assassin",45:"Pugna",46:"Templar Assassin",47:"Viper",48:"Luna",49:"Dragon Knight",50:"Dazzle",51:"Clockwerk",52:"Leshrac",53:"Nature's Prophet",54:"Lifestealer",55:"Dark Seer",56:"Clinkz",57:"Omniknight",58:"Enchantress",59:"Huskar",60:"Night Stalker",61:"Broodmother",62:"Bounty Hunter",63:"Weaver",64:"Jakiro",65:"Batrider",66:"Chen",67:"Spectre",68:"Ancient Apparition",69:"Doom",70:"Ursa",71:"Spirit Breaker",72:"Gyrocopter",73:"Alchemist",74:"Invoker",75:"Silencer",76:"Outworld Destroyer",77:"Lycan",78:"Brewmaster",79:"Shadow Demon",80:"Lone Druid",81:"Chaos Knight",82:"Meepo",83:"Treant Protector",84:"Ogre Magi",85:"Undying",86:"Rubick",87:"Disruptor",88:"Nyx Assassin",89:"Naga Siren",90:"Keeper of the Light",91:"Io",92:"Visage",93:"Slark",94:"Medusa",95:"Troll Warlord",96:"Centaur Warrunner",97:"Magnus",98:"Timbersaw",99:"Bristleback",100:"Tusk",101:"Skywrath Mage",102:"Abaddon",103:"Elder Titan",104:"Legion Commander",106:"Ember Spirit",107:"Earth Spirit",109:"Terrorblade",110:"Phoenix",111:"Oracle",112:"Winter Wyvern",113:"Arc Warden",120:"Pangolier",121:"Dark Willow",123:"Grimstroke",126:"Void Spirit",128:"Snapfire",129:"Mars",135:"Dawnbreaker",136:"Marci",137:"Primal Beast",138:"Muerta"};
+const RM={1:{e:"🪵",n:"Herald"},2:{e:"🛡️",n:"Guardian"},3:{e:"⚒️",n:"Crusader"},4:{e:"🗡️",n:"Archon"},5:{e:"⚔️",n:"Legend"},6:{e:"🏅",n:"Ancient"},7:{e:"💎",n:"Divine"},8:{e:"🌟",n:"Immortal"}};
+
+// ── HELPERS ──────────────────────────────────────
+const h=(s)=>String(s||'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+const fn=(n)=>(n!=null&&n!==0)?Number(n).toLocaleString('en'):'—';
+const sv=(v,s='')=>v!=null?`${v}${s}`:'—';
+const wrc=(w)=>w>=55?'good':w>=50?'ok':'bad';
+const kc=(k)=>k>=4?'good':k>=2?'ok':'bad';
+
+function getRank(t,s){
+  if(t){const r=String(t),tier=parseInt(r[0])||0,stars=r.length>1?parseInt(r[1])||0:0,rk=RM[tier]||{e:"❓",n:"Unknown"};return{e:rk.e,n:rk.n,stars};}
+  if(!s||s==='Uncalibrated')return{e:"❓",n:"Uncalibrated",stars:0};
+  const nl=s.toLowerCase();let tier=0;
+  if(nl.includes('herald'))tier=1;else if(nl.includes('guardian'))tier=2;else if(nl.includes('crusader'))tier=3;else if(nl.includes('archon'))tier=4;else if(nl.includes('legend'))tier=5;else if(nl.includes('ancient'))tier=6;else if(nl.includes('divine'))tier=7;else if(nl.includes('immortal'))tier=8;
+  const stars=(s.match(/★/g)||[]).length,rk=RM[tier]||{e:"❓",n:"Unknown"};
+  return{e:rk.e,n:rk.n,stars};
+}
+function stars(n){return n?`<span style="font-size:9px;color:#fbbf24"> ${'★'.repeat(Math.min(n,5))}</span>`:''}
+function hImg(id,sh){const s=sh||HS[id];return s?`https://cdn.cloudflare.steamstatic.com/apps/dota2/images/dota_react/heroes/${s}.png`:id?`https://api.opendota.com/apps/dota2/images/heroes/${id}_sb.png`:'';}
+function hFb(id){return id?`https://api.opendota.com/apps/dota2/images/heroes/${id}_sb.png`:'';}
+function hName(id,ns){if(ns&&ns!=='Unknown'&&!ns.startsWith('Hero #'))return ns;return HN[id]||(id?`Hero #${id}`:'Unknown');}
+function getTid(){
+  // 1. Telegram Web App (приоритет)
+  const tgId = tg?.initDataUnsafe?.user?.id;
+  if(tgId) return tgId;
+  // 2. URL параметр ?telegram_id=123
+  const urlId = new URLSearchParams(location.search).get('telegram_id');
+  if(urlId) return parseInt(urlId);
+  // 3. localStorage (тестовый режим через панель)
+  const stored = localStorage.getItem('test_telegram_id');
+  if(stored) return parseInt(stored);
+  return null;
+}
+
+// ── NAV ──────────────────────────────────────────
+function goScreen(name){
+  document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('screen-'+name).classList.add('active');
+  document.getElementById('nav-'+name).classList.add('active');
+  if(name==='missions') loadMissions();
+  if(name==='shop') loadShop();
+}
+
+// ── SEARCH ───────────────────────────────────────
+document.getElementById('si').addEventListener('keydown',e=>{if(e.key==='Enter')doSearch();});
+let sugT=null;
+document.getElementById('si').addEventListener('input',e=>{
+  const v=e.target.value.trim();
+  clearTimeout(sugT);
+  if(v.length<2||/^\d+$/.test(v)){closeSug();return;}
+  sugT=setTimeout(()=>fetchSug(v),350);
+});
+document.addEventListener('click',e=>{if(!e.target.closest('.suggest-wrap'))closeSug();});
+
+async function fetchSug(q){
+  try{const r=await fetch(`${API}/search?q=${encodeURIComponent(q)}`);renderSug(await r.json());}
+  catch{closeSug();}
+}
+function renderSug(list){
+  const el=document.getElementById('sugDrop');
+  if(!list?.length){closeSug();return;}
+  el.innerHTML=list.map(p=>`
+    <div class="sug-item" onclick="pickSug('${p.account_id}')">
+      <img class="sug-av" src="${h(p.avatarfull||'')}" onerror="this.style.visibility='hidden'" alt="">
+      <div><div class="sug-name">${h(p.personaname||'Unknown')}</div><div class="sug-id">ID: ${p.account_id}</div></div>
+    </div>`).join('');
+  el.classList.add('open');
+}
+function pickSug(id){document.getElementById('si').value=id;closeSug();doSearch();}
+function closeSug(){document.getElementById('sugDrop').classList.remove('open');}
+
+async function doSearch(){
+  const q=document.getElementById('si').value.trim();
+  if(!q)return;
+  closeSug();clearPicker();setLoad(true);hideErr();clearResults();
+  try{
+    if(/^\d+$/.test(q)){await loadPlayer(q);return;}
+    const r=await fetch(`${API}/search?q=${encodeURIComponent(q)}`);
+    const list=await r.json();
+    if(!list?.length){showErr(`Игрок «${q}» не найден`);return;}
+    if(list.length===1){await loadPlayer(String(list[0].account_id));}
+    else{setLoad(false);showPicker(list);}
+  }catch(e){showErr(e.message||'Ошибка поиска');}
+  finally{setLoad(false);}
+}
+
+function showPicker(list){
+  document.getElementById('pickerBlock').innerHTML=`
+    <div class="picker-card fu">
+      <div class="picker-head">Найдено ${list.length} игроков — выбери нужного</div>
+      ${list.map(p=>`
+        <div class="picker-row" onclick="pickPl('${p.account_id}')">
+          <img class="picker-av" src="${h(p.avatarfull||'')}" onerror="this.style.opacity='.3'" alt="">
+          <div><div class="picker-name">${h(p.personaname||'Unknown')}</div><div class="picker-id">ID: ${p.account_id}</div></div>
+        </div>`).join('')}
+    </div>`;
+}
+async function pickPl(id){clearPicker();document.getElementById('si').value=id;await loadPlayer(id);}
+function clearPicker(){document.getElementById('pickerBlock').innerHTML='';}
+
+async function loadPlayer(query){
+  setLoad(true);hideErr();clearResults();
+  try{
+    const r=await fetch(`${API}/player?query=${encodeURIComponent(query)}`);
+    if(!r.ok){const e=await r.json().catch(()=>{});throw new Error(e?.detail||`Ошибка ${r.status}`);}
+    playerData=await r.json();
+    renderAll(playerData);
+    const tid=getTid();
+    if(tid) loadUserData(tid);
+  }catch(e){showErr(e.message||'Не удалось загрузить данные');}
+  finally{setLoad(false);}
+}
+
+function setLoad(on){
+  document.getElementById('skel').classList.toggle('show',on);
+  const b=document.getElementById('sb');b.disabled=on;b.textContent=on?'...':'Найти';
+}
+function showErr(m){const el=document.getElementById('errBar');document.getElementById('errMsg').textContent=m;el.classList.add('show');}
+function hideErr(){document.getElementById('errBar').classList.remove('show');}
+function clearResults(){document.getElementById('results').innerHTML='';}
+
+// ── RENDER ALL ────────────────────────────────────
+function renderAll(data){
+  const {profile,stats,top_heroes,recent_matches,source,account_id}=data;
+  const trend=data.trend||{};
+  const rank=getRank(profile.rank_tier,profile.rank);
+  const mmr=profile.mmr_estimate||profile.mmr||null;
+  const wc=wrc(stats.winrate);
+  const streak=trend.streak||null;
+  const srcTag=source==='stratz'?'⚡ Stratz':'📊 OpenDota';
+  const rm=(recent_matches||[]).slice(0,20);
+  const avgF=k=>{const v=rm.map(m=>+(m[k]||0)).filter(x=>x>0);return v.length?(v.reduce((a,b)=>a+b,0)/v.length).toFixed(1):'—';};
+  const avgGpm=rm.length?Math.round(rm.reduce((s,m)=>s+(m.gpm||0),0)/rm.length):0;
+  const avgXpm=rm.length?Math.round(rm.reduce((s,m)=>s+(m.xpm||0),0)/rm.length):0;
+
+  const t5wr=sv(trend.last5_winrate,'%'), t5kda=sv(trend.last5_avg_kda), t5gpm=sv(trend.last5_avg_gpm);
+  const t20wr=sv(trend.last20_winrate,'%'), t20kda=sv(trend.last20_avg_kda), t20gpm=sv(trend.last20_avg_gpm);
+
+  document.getElementById('results').innerHTML=`
+  <div class="profile-card fu">
+    <div class="profile-cover"></div>
+    <div class="profile-body">
+      <img class="profile-av" src="${h(profile.avatar||'')}"
+        onerror="this.src='data:image/svg+xml,<svg xmlns=\\'http://www.w3.org/2000/svg\\' width=\\'48\\' height=\\'48\\'><rect fill=\\'%23242f3d\\' width=\\'48\\' height=\\'48\\' rx=\\'10\\'/><text y=\\'34\\' x=\\'9\\' font-size=\\'26\\'>🎮</text></svg>'" alt="">
+      <div class="profile-info">
+        <div class="profile-name">${h(profile.name)}</div>
+        <div class="profile-tags">
+          <span class="tag tag-blue">${srcTag}</span>
+          <span class="tag tag-muted">ID ${h(String(account_id||''))}</span>
+          ${profile.is_anonymous?'<span class="tag tag-muted">🔒 Приватный</span>':''}
+        </div>
+      </div>
+      <div class="profile-right">
+        <div class="rank-box">
+          <div class="rank-em">${rank.e}</div>
+          <div class="rank-name">${h(rank.n)}${stars(rank.stars)}</div>
+        </div>
+        ${mmr?`<div class="mmr-box"><div class="mmr-val">${fn(mmr)}</div><div class="mmr-lbl">MMR</div></div>`:''}
+      </div>
+    </div>
+  </div>
+
+  <div class="tab-bar fu">
+    <button class="tab-btn active" onclick="swTab('overview',this)">Обзор</button>
+    <button class="tab-btn" onclick="swTab('matches',this)">Матчи</button>
+    <button class="tab-btn" onclick="swTab('heroes',this)">Герои</button>
+    <button class="tab-btn" onclick="swTab('ai',this)">🤖 AI</button>
+  </div>
+
+  <div class="tab-panel active" id="tp-overview">
+    ${streak?.count>=2?`<div class="streak ${streak.type} fu">${streak.type==='win'?'🔥':'❄️'} ${streak.count} ${streak.type==='win'?'победы подряд':'поражений подряд'}</div>`:''}
+    <div class="wr-card fu">
+      <div class="wr-top">
+        <div>
+          <div class="wr-big ${wc}">${stats.winrate}%</div>
+          <div class="wr-label">Винрейт за всё время</div>
+        </div>
+        <div class="wr-wl">
+          <div class="wr-w">▲ ${stats.wins}П</div>
+          <div class="wr-l">▼ ${stats.losses}П</div>
+          <div class="wr-total">${stats.total_matches} матчей</div>
+        </div>
+      </div>
+      <div class="section-lbl">Последние ${rm.length} матчей</div>
+      <div class="wr-dots" id="wrDots"></div>
+      <div class="wr-bar"><div class="wr-bar-fill ${wc}" id="wrFill" style="width:0%"></div></div>
+    </div>
+
+    <div class="section-lbl">Тренды</div>
+    <div class="trend-grid fu">
+      <div class="trend-box">
+        <div class="trend-head">Последние 5</div>
+        <div class="trend-row"><span class="trend-key">WR</span><span class="trend-val ${trend.last5_winrate!=null?wrc(trend.last5_winrate):''}">${t5wr}</span></div>
+        <div class="trend-row"><span class="trend-key">KDA</span><span class="trend-val ${trend.last5_avg_kda!=null?kc(trend.last5_avg_kda):''}">${t5kda}</span></div>
+        <div class="trend-row"><span class="trend-key">GPM</span><span class="trend-val">${t5gpm}</span></div>
+      </div>
+      <div class="trend-box">
+        <div class="trend-head">Последние 20</div>
+        <div class="trend-row"><span class="trend-key">WR</span><span class="trend-val ${trend.last20_winrate!=null?wrc(trend.last20_winrate):''}">${t20wr}</span></div>
+        <div class="trend-row"><span class="trend-key">KDA</span><span class="trend-val ${trend.last20_avg_kda!=null?kc(trend.last20_avg_kda):''}">${t20kda}</span></div>
+        <div class="trend-row"><span class="trend-key">GPM</span><span class="trend-val">${t20gpm}</span></div>
+      </div>
+    </div>
+
+    <div class="section-lbl">Средние (20 матчей)</div>
+    <div class="stats-grid fu">
+      <div class="stat-box"><div class="stat-num ${kc(parseFloat(avgF('kda'))||0)}">${avgF('kda')}</div><div class="stat-lbl">KDA</div></div>
+      <div class="stat-box"><div class="stat-num au">${avgF('kills')}</div><div class="stat-lbl">Kills</div></div>
+      <div class="stat-box"><div class="stat-num r">${avgF('deaths')}</div><div class="stat-lbl">Deaths</div></div>
+      <div class="stat-box"><div class="stat-num b">${avgF('assists')}</div><div class="stat-lbl">Assists</div></div>
+      <div class="stat-box"><div class="stat-num g">${avgGpm||'—'}</div><div class="stat-lbl">GPM</div></div>
+      <div class="stat-box"><div class="stat-num p">${avgXpm||'—'}</div><div class="stat-lbl">XPM</div></div>
+    </div>
+
+    <div class="chart-card fu">
+      <div class="chart-head">
+        <div class="chart-title">KDA по матчам</div>
+        <div class="chart-leg">
+          <div class="leg"><div class="leg-dot" style="background:#10b981"></div>Победа</div>
+          <div class="leg"><div class="leg-dot" style="background:#ef4444"></div>Поражение</div>
+        </div>
+      </div>
+      <div class="chart-wrap"><canvas id="kdaChart"></canvas></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tp-matches">
+    <div class="match-list" id="matchList"></div>
+  </div>
+
+  <div class="tab-panel" id="tp-heroes">
+    <div class="hero-list" id="heroList">
+      <div class="empty"><span class="empty-icon" style="font-size:28px">⏳</span><div class="empty-text">Загрузка...</div></div>
+    </div>
+  </div>
+
+  <div class="tab-panel" id="tp-ai">
+    <div class="ai-wrap">
+      <div class="ai-quick fu">
+        <div class="ai-q-btn" onclick="aiQ('analysis')"><div class="ai-q-icon">🧠</div><div><div class="ai-q-title">Разбор игры</div><div class="ai-q-desc">Что хорошо и плохо</div></div></div>
+        <div class="ai-q-btn" onclick="aiQ('forecast')"><div class="ai-q-icon">📈</div><div><div class="ai-q-title">Прогноз MMR</div><div class="ai-q-desc">Будет ли рост</div></div></div>
+        <div class="ai-q-btn" onclick="aiQ('heroes')"><div class="ai-q-icon">🎯</div><div><div class="ai-q-title">Пул героев</div><div class="ai-q-desc">Что учить дальше</div></div></div>
+        <div class="ai-q-btn" onclick="aiQ('weak')"><div class="ai-q-icon">🔍</div><div><div class="ai-q-title">Слабые места</div><div class="ai-q-desc">Где теряешь игры</div></div></div>
+      </div>
+      <div class="ai-chat fu">
+        <div class="ai-msgs" id="aiMsgs">
+          <div class="ai-msg bot"><div class="ai-avatar">🤖</div><div class="ai-bubble">Привет! Нажми кнопку выше или задай вопрос про игрока.</div></div>
+        </div>
+        <div class="ai-typing" id="aiTyping"><i></i><i></i><i></i></div>
+        <div class="ai-input-row">
+          <input class="ai-input" id="aiIn" type="text" placeholder="Спроси про игрока..." autocomplete="off"/>
+          <button class="ai-send" id="aiBtn" onclick="aiSend()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+          </button>
+        </div>
+      </div>
+    </div>
+  </div>
+  `;
+
+  setTimeout(()=>{const f=document.getElementById('wrFill');if(f)f.style.width=stats.winrate+'%';},100);
+  const dd=document.getElementById('wrDots');
+  rm.forEach(m=>{const d=document.createElement('div');d.className=`dot ${m.win?'w':'l'}`;d.textContent=m.win?'W':'L';dd.appendChild(d);});
+  drawChart(rm);
+  renderMatches(rm);
+  renderHeroes(top_heroes||[]);
+  document.getElementById('aiIn').addEventListener('keydown',e=>{if(e.key==='Enter')aiSend();});
+}
+
+// ── TABS ─────────────────────────────────────────
+function swTab(id,btn){
+  document.querySelectorAll('.tab-panel').forEach(p=>p.classList.remove('active'));
+  document.querySelectorAll('.tab-btn').forEach(b=>b.classList.remove('active'));
+  document.getElementById('tp-'+id).classList.add('active');
+  btn.classList.add('active');
+}
+
+// ── MATCHES ──────────────────────────────────────
+function renderMatches(ms){
+  document.getElementById('matchList').innerHTML=ms.slice(0,20).map((m,i)=>{
+    const img=hImg(m.hero_id,m.hero_short),fb=hFb(m.hero_id);
+    const name=hName(m.hero_id,m.hero);
+    const dur=m.duration_min!=null?`${m.duration_min}:${String(m.duration_sec||0).padStart(2,'0')}`:'';
+    const kda=m.kda??0,wc=m.win?'win':'loss';
+    return `
+    <div class="match-card ${wc}" id="mc${i}">
+      <div class="match-main" onclick="togM(${i})">
+        <img class="match-himg" src="${h(img)}" onerror="this.src='${h(fb)}';this.onerror=null" alt="${h(name)}"/>
+        <div>
+          <div class="match-kda">${m.kills}/<span style="color:#ef4444">${m.deaths}</span>/${m.assists}</div>
+          <div class="match-hero">${h(name)}</div>
+          ${dur?`<div class="match-dur">⏱ ${dur}</div>`:''}
+        </div>
+        <div class="match-kda-big ${kc(kda)}">${kda}</div>
+        <div style="display:flex;flex-direction:column;align-items:flex-end;gap:5px">
+          <div class="match-pill ${wc}">${m.win?'Победа':'Пор.'}</div>
+          <span class="match-chevron">▾</span>
+        </div>
+      </div>
+      <div class="match-expand" id="me${i}">
+        <div class="mex-grid">
+          <div class="mex-cell"><div class="mex-val au">${fn(m.networth)}</div><div class="mex-lbl">Networth</div></div>
+          <div class="mex-cell"><div class="mex-val r">${fn(m.hero_damage)}</div><div class="mex-lbl">Hero DMG</div></div>
+          <div class="mex-cell"><div class="mex-val p">${fn(m.tower_damage)}</div><div class="mex-lbl">Tower DMG</div></div>
+          <div class="mex-cell"><div class="mex-val g">${fn(m.healing)}</div><div class="mex-lbl">Healing</div></div>
+          <div class="mex-cell"><div class="mex-val b">${m.last_hits??'—'}</div><div class="mex-lbl">Last Hits</div></div>
+          <div class="mex-cell"><div class="mex-val">${m.denies??'—'}</div><div class="mex-lbl">Denies</div></div>
+          <div class="mex-cell"><div class="mex-val g">${m.gpm||'—'}</div><div class="mex-lbl">GPM</div></div>
+          <div class="mex-cell"><div class="mex-val p">${m.xpm||'—'}</div><div class="mex-lbl">XPM</div></div>
+          <div class="mex-cell"><div class="mex-val">${m.match_id?'#'+String(m.match_id).slice(-6):''}</div><div class="mex-lbl">ID</div></div>
+        </div>
+        <div class="match-links">
+          <a class="ext-link" href="https://www.dotabuff.com/matches/${m.match_id}" target="_blank">📊 Dotabuff</a>
+          <a class="ext-link" href="https://stratz.com/matches/${m.match_id}" target="_blank">⚡ Stratz</a>
+        </div>
+      </div>
+    </div>`;
+  }).join('');
+}
+function togM(i){const c=document.getElementById(`mc${i}`);c.classList.toggle('open');}
+
+// ── HEROES ───────────────────────────────────────
+function renderHeroes(list){
+  const el=document.getElementById('heroList');
+  if(!list?.length){el.innerHTML='<div class="empty"><span class="empty-icon" style="font-size:28px">📊</span><div class="empty-text">Нет данных</div></div>';return;}
+  el.innerHTML=list.slice(0,10).map((hero,i)=>{
+    const img=hImg(hero.hero_id,hero.hero_short),fb=hFb(hero.hero_id);
+    const name=hName(hero.hero_id,hero.hero_name);
+    const wr=hero.winrate!==undefined?hero.winrate:(hero.wins&&hero.matches?Math.round(hero.wins/hero.matches*100):0);
+    const wc=wrc(wr),clr=wc==='good'?'#10b981':wc==='ok'?'#fbbf24':'#ef4444';
+    const kda=hero.kda??'—',gpm=hero.avg_gpm?` · ${hero.avg_gpm}GPM`:'';
+    return `
+    <div class="hero-row">
+      <div class="hero-n">${i+1}</div>
+      <img class="hero-img" src="${h(img)}" onerror="this.src='${h(fb)}';this.onerror=null" alt="${h(name)}"/>
+      <div class="hero-name">${h(name)}</div>
+      <div class="hero-meta">
+        <div class="hero-games">${hero.matches||0} игр</div>
+        <div class="hero-kda">KDA ${kda}${gpm}</div>
+      </div>
+      <div class="hero-bar-wrap"><div class="hero-bar-fill" style="width:${wr}%;background:${clr}"></div></div>
+      <div class="hero-wr ${wc}">${wr}%</div>
+    </div>`;
+  }).join('');
+}
+
+// ── CHART ────────────────────────────────────────
+function drawChart(ms){
+  if(chartInst){chartInst.destroy();chartInst=null;}
+  const ctx=document.getElementById('kdaChart')?.getContext('2d');
+  if(!ctx)return;
+  const rev=[...ms.slice(0,15)].reverse();
+  chartInst=new Chart(ctx,{
+    type:'bar',
+    data:{
+      labels:rev.map((_,i)=>`#${i+1}`),
+      datasets:[{
+        data:rev.map(m=>m.kda||0),
+        backgroundColor:rev.map(m=>m.win?'rgba(76,217,100,.5)':'rgba(255,59,48,.45)'),
+        borderColor:rev.map(m=>m.win?'#4cd964':'#ff3b30'),
+        borderWidth:1,borderRadius:4,borderSkipped:false,
+      }]
+    },
+    options:{
+      responsive:true,maintainAspectRatio:false,
+      animation:{duration:500},
+      plugins:{legend:{display:false},tooltip:{backgroundColor:'#242f3d',borderColor:'#2f3f50',borderWidth:1,titleColor:'#7d9ab5',bodyColor:'#e8f4fd',padding:8,callbacks:{title:c=>`Матч ${c[0].label}`,label:c=>` KDA: ${c.raw}`}}},
+      scales:{
+        x:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4a6278',font:{family:'Inter',size:8}}},
+        y:{grid:{color:'rgba(255,255,255,.04)'},ticks:{color:'#4a6278',font:{family:'Inter',size:8}},beginAtZero:true}
+      }
+    }
+  });
+}
+
+// ── AI ───────────────────────────────────────────
+function buildCtx(){
+  if(!playerData)return"No player data.";
+  const d=playerData,p=d.profile,s=d.stats,t=d.trend||{};
+  const heroes=(d.top_heroes||[]).slice(0,5).map(h=>`${h.hero_name||h.hero_id}(${h.matches}г,WR${h.winrate}%,KDA${h.kda})`).join(', ');
+  const matches=(d.recent_matches||[]).slice(0,8).map(m=>`${m.win?'Win':'Loss'} ${m.hero||'?'} ${m.kills}/${m.deaths}/${m.assists} KDA${m.kda}`).join('\n');
+  return `Игрок: ${p.name} | Ранг: ${p.rank}\nWR: ${s.winrate}% (${s.wins}П/${s.losses}П)\nLast5: WR${t.last5_winrate??'?'}% KDA${t.last5_avg_kda??'?'} GPM${t.last5_avg_gpm??'?'}\nStreak: ${t.streak?.count||0} ${t.streak?.type||'-'}\nГерои: ${heroes}\nМатчи:\n${matches}`.trim();
+}
+const AI_P={
+  analysis:"Сделай детальный разбор игры этого игрока. Что хорошо и плохо? Ключевые проблемы?",
+  forecast:"На основе трендов — будет ли этот игрок расти в MMR? Что изменить?",
+  heroes:"Посмотри на пул героев. Каких стоит освоить следующими и почему?",
+  weak:"Найди конкретные слабые места. Где именно теряются игры?"
+};
+async function callAI(msg){
+  const ctx=buildCtx();
+  const tid=getTid();
+
+  // AI работает и без telegram_id, но с лимитами только для зарегистрированных
+  const msgs=aiHistory.length===0?[{role:"user",content:`Данные игрока:\n${ctx}\n\n---\n${msg}`}]:[...aiHistory.slice(-6),{role:"user",content:msg}];
+  const payload = {
+    message:msg,
+    player_context:ctx,
+    history:aiHistory.slice(-6)
+  };
+
+  // Добавляем telegram_id только если он есть
+  if(tid) payload.telegram_id = tid;
+
+  const r=await fetch(`${API}/ai`,{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)});
+  if(!r.ok){
+    const e=await r.json().catch(()=>{});
+    if(r.status===429){
+      // Лимит исчерпан
+      throw new Error(e?.detail||'Лимит AI запросов исчерпан');
+    }
+    throw new Error(e?.detail||`Ошибка ${r.status}`);
+  }
+  const d=await r.json(),text=d.reply||'Нет ответа';
+  aiHistory.push({role:'user',content:msg},{role:'assistant',content:text});
+
+  // Обновить счетчик AI запросов
+  if(tid && d.ai_remaining !== undefined){
+    if(currentUser){
+      currentUser.ai_limit={remaining:d.ai_remaining,limit:d.ai_limit};
+      updatePremiumBadge({premium:currentUser.premium,ai_requests:currentUser.ai_limit});
+    }
+  }
+
+  return text;
+}
+function setAILoad(on){
+  document.getElementById('aiTyping').classList.toggle('on',on);
+  const b=document.getElementById('aiBtn');if(b)b.disabled=on;
+}
+function addMsg(role,text){
+  const el=document.getElementById('aiMsgs');if(!el)return;
+  const d=document.createElement('div');d.className=`ai-msg ${role}`;
+  d.innerHTML=`<div class="ai-avatar">${role==='bot'?'🤖':'👤'}</div><div class="ai-bubble">${h(text).replace(/\n/g,'<br>')}</div>`;
+  el.appendChild(d);el.scrollTop=el.scrollHeight;
+}
+async function aiSend(){
+  const inp=document.getElementById('aiIn');
+  const msg=inp?.value.trim();if(!msg)return;
+  if(!playerData){addMsg('bot','⚠️ Сначала найди игрока');return;}
+  inp.value='';addMsg('user',msg);setAILoad(true);
+  try{addMsg('bot',await callAI(msg));}
+  catch(e){addMsg('bot',`❌ Ошибка: ${e.message}`);}
+  finally{setAILoad(false);}
+}
+async function aiQ(type){
+  if(!playerData){alert('Сначала найди игрока!');return;}
+  swTab('ai',document.querySelectorAll('.tab-btn')[3]);
+  const p=AI_P[type];addMsg('user',p);setAILoad(true);
+  try{addMsg('bot',await callAI(p));}
+  catch(e){addMsg('bot',`❌ Ошибка: ${e.message}`);}
+  finally{setAILoad(false);}
+}
+
+// ── USER DATA ─────────────────────────────────────
+async function loadUserData(tid){
+  try{
+    const [ur, pr]=await Promise.all([
+      fetch(`${API}/user/profile?telegram_id=${tid}`),
+      fetch(`${API}/premium/status?telegram_id=${tid}`)
+    ]);
+    if(ur.ok){
+      const d=await ur.json();
+      currentUser=d.user;
+      updateBalance(currentUser.coins||0);
+    }
+    if(pr.ok){
+      const pd=await pr.json();
+      if(currentUser){ currentUser.premium=pd.premium; currentUser.ai_limit=pd.ai_requests; }
+      updatePremiumBadge(pd);
+    }
+  }catch(e){ console.error('loadUserData error:',e); }
+}
+
+function updatePremiumBadge(premiumData){
+  // Обновить маленький бейдж вверху
+  const badge=document.getElementById('premiumBadge');
+  if(badge){
+    if(premiumData.premium){
+      badge.innerHTML=`⭐ Premium | AI: ${premiumData.ai_requests?.remaining??'?'}/${premiumData.ai_requests?.limit??'?'}`;
+      badge.style.background='linear-gradient(135deg, #8b5cf6, #06b6d4)';
+    }else{
+      badge.innerHTML=`🆓 Free | AI: ${premiumData.ai_requests?.remaining??'?'}/${premiumData.ai_requests?.limit??'?'}`;
+      badge.style.background='var(--bg-card)';
+    }
+  }
+  // Обновить premium banner на вкладке миссий
+  renderPremiumBanner(premiumData);
+}
+
+function renderPremiumBanner(pd){
+  const el=document.getElementById('premiumBanner');
+  if(!el)return;
+  el.style.display='block';
+  if(pd.premium){
+    const until=pd.premium_until?new Date(pd.premium_until).toLocaleDateString('ru-RU'):'—';
+    el.innerHTML=`
+      <div class="premium-active-badge">⭐ Premium активен до ${until}</div>`;
+  } else {
+    const rem=pd.ai_requests?.remaining??0;
+    const lim=pd.ai_requests?.limit??5;
+    el.innerHTML=`
+    <div class="premium-banner">
+      <div class="premium-banner-title">⭐ Dota 2 Analyzer Premium</div>
+      <div class="premium-banner-sub">Разблокируй полный потенциал</div>
+      <div class="premium-features">
+        <div class="premium-feat">3 миссии в день вместо 1</div>
+        <div class="premium-feat">100 AI запросов/день (сейчас: ${rem}/${lim})</div>
+        <div class="premium-feat">Приоритетные обновления</div>
+        <div class="premium-feat">Эксклюзивные награды</div>
+      </div>
+      <button class="premium-buy-btn" onclick="buyPremium()">
+        ⭐ Купить Premium — 129 звёзд / мес
+      </button>
+    </div>`;
+  }
+}
+
+async function buyPremium(){
+  const tid=getTid();
+  if(!tid){
+    if(tg?.showAlert) tg.showAlert('Открой через Telegram бота!');
+    else alert('Открой через Telegram бота!');
+    return;
+  }
+
+  // Показываем фичи + цену из /premium/features
+  let featuresTxt = '• 3 миссии в день\n• 100 AI запросов/день\n• Deep-анализ профиля\n• Предсказание матчей\n• Синергия героев\n• Трекер до 20 игроков';
+  let priceStars = 129;
+  try{
+    const fr = await fetch(`${API}/premium/features`);
+    const fd = await fr.json();
+    priceStars = fd.price_stars || 129;
+    if(Array.isArray(fd.features)){
+      featuresTxt = fd.features.map(f=>`${f.icon} ${f.title}`).join('\n');
+    }
+  }catch(_){}
+
+  const confirmText = `Купить Premium за ${priceStars} ⭐?\n\n${featuresTxt}`;
+  const ok = tg?.showConfirm
+    ? await new Promise(res=>tg.showConfirm(confirmText, res))
+    : confirm(confirmText);
+  if(!ok) return;
+
+  try{
+    // Запрашиваем invoice-ссылку на Telegram Stars
+    const r=await fetch(`${API}/premium/invoice`,{
+      method:'POST',
+      headers:Object.assign({'Content-Type':'application/json'}, TG_INIT_DATA?{'X-Telegram-Init-Data':TG_INIT_DATA}:{}),
+      body:JSON.stringify({telegram_id:tid})
+    });
+    const d=await r.json();
+    if(!d.invoice_link) throw new Error(d.detail||'Не удалось создать счёт');
+
+    // Открываем нативный диалог оплаты Stars
+    if(tg?.openInvoice){
+      tg.openInvoice(d.invoice_link, (status)=>{
+        if(status==='paid'){
+          if(tg?.showAlert) tg.showAlert('🎉 Premium активирован!');
+          setTimeout(()=>{ loadUserData(tid); loadMissions(); }, 1500);
+        } else if(status==='failed' || status==='cancelled'){
+          tg?.showAlert?.('Оплата не завершена');
+        }
+      });
+    } else {
+      // Fallback: открыть ссылку
+      window.open(d.invoice_link, '_blank');
+    }
+  }catch(e){
+    if(tg?.showAlert) tg.showAlert('❌ '+(e.message||e));
+    else alert('❌ '+(e.message||e));
+  }
+}
+
+function updateBalance(coins){
+  document.getElementById('mCoins').textContent=`💰 ${coins}`;
+  document.getElementById('sCoins').textContent=`💰 ${coins}`;
+}
+
+// ── MISSIONS ──────────────────────────────────────
+async function loadMissions(){
+  const el=document.getElementById('mList');
+  const tid=getTid();
+  if(!tid){
+    el.innerHTML='<div class="empty"><span class="empty-icon">🔍</span><div class="empty-text">Открой через Telegram бота<br>или введи свой Telegram ID ниже</div></div>';
+    const panel=document.getElementById('testPanel');
+    if(panel) panel.style.display='block';
+    return;
+  }
+  el.innerHTML='<div class="empty"><span class="empty-icon" style="font-size:28px">⏳</span><div class="empty-text">Загрузка миссий...</div></div>';
+  try{
+    const r=await fetch(`${API}/missions?telegram_id=${tid}`);
+    const d=await r.json();
+    if(r.ok && d.status==='ok'){
+      renderMissions(d.missions||[]);
+    } else {
+      el.innerHTML=`<div class="empty"><span class="empty-icon">⚠️</span><div class="empty-text">Ошибка: ${d.detail||'не удалось загрузить'}</div></div>`;
+    }
+  }catch(e){
+    console.error('Load missions error:', e);
+    el.innerHTML='<div class="empty"><span class="empty-icon">⚠️</span><div class="empty-text">Ошибка сети. Проверь подключение.</div></div>';
+  }
+}
+
+function renderLocalMissions(data){
+  // Локальные миссии отключены — только серверные (с реальными id для claim)
+  loadMissions();
+}
+
+function renderMissions(ms){
+  const el=document.getElementById('mList');
+  if(!ms?.length){el.innerHTML='<div class="empty"><span class="empty-icon">📭</span><div class="empty-text">Нет активных миссий</div></div>';return;}
+  const groups={daily:[],weekly:[],monthly:[]};
+  ms.forEach(m=>{const t=m.type||'daily';(groups[t]=groups[t]||[]).push(m);});
+  const labels={daily:'Ежедневные',weekly:'Недельные',monthly:'Месячные'};
+  let html='';
+  ['daily','weekly','monthly'].forEach(type=>{
+    if(!groups[type]?.length)return;
+    html+=`<div class="type-badge">${labels[type]}</div>`;
+    groups[type].forEach(m=>{
+      const tv=m.target_value||m.target||1;
+      const pct=Math.min(Math.round((m.progress||0)/tv*100),100);
+      const done=m.completed||m.done||pct>=100;
+      const canClaim=done&&!m.claimed;
+      html+=`
+      <div class="mission-card ${done?'done':''}">
+        <div class="mission-top">
+          <div class="mission-icon">${m.icon||'🎯'}</div>
+          <div style="flex:1;min-width:0">
+            <div class="mission-title">${h(m.title)}</div>
+            <div class="mission-desc">${h(m.description||m.desc||'')}</div>
+          </div>
+          <div class="mission-reward">
+            <div class="mission-coins">+${m.reward_coins||m.coins||0}💰</div>
+            <div class="mission-xp">+${m.reward_xp||m.xp||0} XP</div>
+          </div>
+        </div>
+        <div class="mission-bar-bg"><div class="mission-bar-fill" style="width:${pct}%;background:${done?'#10b981':'var(--accent-primary)'}"></div></div>
+        <div class="mission-progress"><span>${m.progress||0} / ${tv}</span><span>${pct}%</span></div>
+        ${canClaim?`<button class="claim-btn" data-mission-id="${m.id||0}">✅ Получить награду</button>`:''}
+      </div>`;
+    });
+  });
+  el.innerHTML=html;
+
+  // Добавляем обработчики событий для кнопок
+  el.querySelectorAll('.claim-btn').forEach(btn=>{
+    btn.addEventListener('click',function(){
+      const missionId=parseInt(this.getAttribute('data-mission-id'));
+      claimM(missionId, this);
+    });
+  });
+}
+
+async function claimM(id, btn){
+  const tid=getTid();
+  if(!tid){ showTestPanel(); return; }
+  if(!id){ alert('❌ ID миссии не найден'); return; }
+
+  // Блокируем кнопку чтобы не нажали дважды
+  if(btn){ btn.disabled=true; btn.textContent='⏳ Загрузка...'; }
+
+  try{
+    const r=await fetch(`${API}/missions/claim`,{
+      method:'POST',
+      headers:Object.assign({'Content-Type':'application/json'}, TG_INIT_DATA?{'X-Telegram-Init-Data':TG_INIT_DATA}:{}),
+      body:JSON.stringify({telegram_id:tid, mission_id:id})
+    });
+    const d=await r.json();
+    if(r.ok && d.status==='ok'){
+      // Показать уведомление
+      if(tg?.showAlert){
+        tg.showAlert(`🎉 Награда получена!\n\n💰 +${d.reward?.coins||0} монет\n⭐ +${d.reward?.xp||0} XP`);
+      } else {
+        alert(`🎉 Награда получена!\n\n💰 +${d.reward?.coins||0} монет\n⭐ +${d.reward?.xp||0} XP`);
+      }
+      loadUserData(tid);
+      loadMissions();
+    } else {
+      const msg = d.detail||'Не удалось получить награду';
+      if(tg?.showAlert) tg.showAlert('❌ '+msg);
+      else alert('❌ '+msg);
+      if(btn){ btn.disabled=false; btn.textContent='✅ Получить награду'; }
+    }
+  }catch(e){
+    alert('❌ Ошибка сети: '+e.message);
+    if(btn){ btn.disabled=false; btn.textContent='✅ Получить награду'; }
+  }
+}
+
+// ── SHOP ─────────────────────────────────────────
+async function loadShop(){
+  const el=document.getElementById('sItems');
+  el.innerHTML='<div class="empty"><span class="empty-icon" style="font-size:28px">⏳</span><div class="empty-text">Загрузка...</div></div>';
+  try{
+    const r=await fetch(`${API}/shop`);
+    if(!r.ok)throw new Error();
+    const d=await r.json();
+    const tid=getTid();if(tid)loadUserData(tid);
+    renderShop(d.items||[]);
+  }catch{
+    el.innerHTML='<div class="empty"><span class="empty-icon">⚠️</span><div class="empty-text">Не удалось загрузить магазин</div></div>';
+  }
+}
+
+function renderShop(items){
+  const el=document.getElementById('sItems');
+  if(!items?.length){el.innerHTML='<div class="empty"><span class="empty-icon">📦</span><div class="empty-text">Магазин пуст</div></div>';return;}
+  const coins=currentUser?.coins||0;
+  const labels={premium:'⭐ Premium',booster_xp:'XP Бустеры',booster_coins:'Монетные бустеры',booster_mega:'Мега бустеры',cosmetic_frame:'Рамки',cosmetic_title:'Титулы',special_mission:'Специальное',special_refresh:'Специальное',special_ai:'Специальное'};
+  const groups={};
+  // Deduplicate items by id
+  const seen=new Set();
+  const uniqueItems=items.filter(i=>{if(seen.has(i.id))return false;seen.add(i.id);return true;});
+  uniqueItems.forEach(i=>{(groups[i.type]=groups[i.type]||[]).push(i);});
+  let html='';
+  // Show premium first
+  const order=['premium','booster_xp','booster_coins','booster_mega','cosmetic_frame','cosmetic_title','special_ai','special_refresh','special_mission'];
+  const keys=[...order.filter(k=>groups[k]),...Object.keys(groups).filter(k=>!order.includes(k))];
+  keys.forEach(type=>{
+    html+=`<div class="type-badge">${labels[type]||type}</div>`;
+    groups[type].forEach(item=>{
+      const isPremium=item.type==='premium';
+      const priceIcon=isPremium?'⭐':'💰';
+      const can=isPremium||coins>=item.price;
+      html+=`
+      <div class="shop-item${isPremium?' premium-item':''}">
+        <div class="shop-top">
+          <div class="shop-icon">${item.icon||'📦'}</div>
+          <div style="flex:1;min-width:0">
+            <div class="shop-name">${h(item.name)}</div>
+            <div class="shop-desc">${h(item.description||'')}</div>
+          </div>
+          <div class="shop-price">${item.price}${priceIcon}</div>
+        </div>
+        <button class="buy-btn${isPremium?' premium-btn':''}" onclick="buyItem(${item.id},'${h(item.name)}',${item.price},'${item.type}')" ${!can?'disabled':''}>
+          ${isPremium?'⭐ Купить Premium':can?'Купить':'Недостаточно монет'}
+        </button>
+      </div>`;
+    });
+  });
+  el.innerHTML=html;
+}
+
+async function buyItem(id,name,price,type){
+  const tid=getTid();
+  if(!tid){tg?.showAlert?.('Авторизуйся через Telegram для покупок');return;}
+  const isPremium=type==='premium';
+  const confirmMsg=isPremium?`Купить ${name} за ${price}⭐?`:`Купить ${name} за ${price}💰?`;
+  const ok=await (tg?.showConfirm?.(confirmMsg) ?? Promise.resolve(confirm(confirmMsg)));
+  if(!ok)return;
+  try{
+    const r=await fetch(`${API}/shop/buy`,{method:'POST',headers:Object.assign({'Content-Type':'application/json'},TG_INIT_DATA?{'X-Telegram-Init-Data':TG_INIT_DATA}:{}),body:JSON.stringify({telegram_id:tid,item_id:id})});
+    const d=await r.json();
+    if(d.status==='ok'||d.item_name){
+      const msg=isPremium?`✅ Premium активирован!\nПриятной игры!`:`✅ Куплено!\nОсталось: ${d.coins_left}💰`;
+      tg?.showAlert?.(msg) || alert(msg);
+      loadUserData(tid);loadShop();
+    }else throw new Error(d.detail||'Ошибка');
+  }catch(e){tg?.showAlert?.(e.message)||alert(e.message);}
+}
+
+// ── TEST MODE ────────────────────────────────────
+function showTestPanel(){
+  const panel = document.getElementById('testPanel');
+  if(panel) { panel.style.display = panel.style.display==='none'?'block':'block'; panel.scrollIntoView({behavior:'smooth'}); }
+}
+
+function setTestId(){
+  const inp=document.getElementById('testIdInput');
+  const id=inp?.value.trim();
+  if(!id||!parseInt(id)){
+    alert('Введите корректный Telegram ID');
+    return;
+  }
+  localStorage.setItem('test_telegram_id',id);
+  const panel=document.getElementById('testPanel');
+  if(panel) panel.style.display='none';
+  loadUserData(parseInt(id));
+  loadMissions();
+}
+
+// ── WELCOME ──────────────────────────────────────
+function hideWelcome(){
+  const ws=document.getElementById('welcomeScreen');
+  ws.classList.add('hide');
+  setTimeout(()=>ws.style.display='none',500);
+}
+
+// ── INIT ─────────────────────────────────────────
+window.addEventListener('DOMContentLoaded',()=>{
+  const tid=getTid();
+  if(tid){
+    loadUserData(tid);
+  } else {
+    // Не в Telegram — показать тестовую панель
+    const panel=document.getElementById('testPanel');
+    if(panel) panel.style.display='block';
+  }
+
+  // Если открыт с player_id в URL
+  const params=new URLSearchParams(location.search);
+  const pid=params.get('player_id');
+  if(pid){document.getElementById('si').value=pid;doSearch();}
+
+  // Автоматически скрыть welcome через 3 секунды
+  setTimeout(hideWelcome,3000);
+});
+</script>
+</body>
+</html>
