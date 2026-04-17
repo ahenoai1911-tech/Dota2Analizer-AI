@@ -34,7 +34,7 @@ app = FastAPI(title="Dota 2 Analyzer API", version="2.4.0")
 BOT_TOKEN             = os.getenv("BOT_TOKEN", "")
 WEBAPP_URL            = os.getenv("WEBAPP_URL", "")
 STRATZ_TOKEN          = os.getenv("STRATZ_TOKEN", "")
-GROQ_API_KEY          = os.getenv("GROQ_API_KEY", "")
+AI_API_KEY          = os.getenv("AI_API_KEY", "")
 DATABASE_URL          = os.getenv("DATABASE_URL", "")
 TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
 ALLOWED_ORIGINS       = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
