@@ -863,7 +863,24 @@ body{
 
 <script>
 // ── CONFIG ──────────────────────────────────────
-const API = "https://dota2-analyzer-production.up.railway.app";
+// По умолчанию API = тот же origin (раздаётся с того же Railway-сервера через /app).
+// Можно переопределить через ?api=https://other-domain или <meta name="api-url" content="...">.
+const API = (function(){
+  try {
+    const urlParam = new URLSearchParams(location.search).get('api');
+    if (urlParam) return urlParam.replace(/\/$/, '');
+    const meta = document.querySelector('meta[name="api-url"]');
+    if (meta?.content) return meta.content.replace(/\/$/, '');
+    // Если index.html открыт через file:// — фоллбэк на прод-домен
+    if (location.protocol === 'file:' || location.hostname === 'localhost') {
+      return 'https://dota2analizer-ai-production.up.railway.app';
+    }
+    return location.origin;
+  } catch(_) {
+    return 'https://dota2analizer-ai-production.up.railway.app';
+  }
+})();
+console.log('API base URL:', API);
 
 let tg = null;
 let TG_INIT_DATA = "";   // initData (signed) для X-Telegram-Init-Data
