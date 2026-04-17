@@ -34,15 +34,40 @@ app = FastAPI(title="Dota 2 Analyzer API", version="2.4.0")
 BOT_TOKEN             = os.getenv("BOT_TOKEN", "")
 WEBAPP_URL            = os.getenv("WEBAPP_URL", "")
 STRATZ_TOKEN          = os.getenv("STRATZ_TOKEN", "")
-AI_API_KEY          = os.getenv("AI_API_KEY", "")
+# AI provider: groq | cerebras | openai | openrouter (OpenAI-compatible)
+# Поддерживаем и GROQ_API_KEY (legacy) и AI_API_KEY (универсальный).
+AI_PROVIDER           = os.getenv("AI_PROVIDER", "cerebras").lower()
+AI_API_KEY            = os.getenv("AI_API_KEY", "") or os.getenv("GROQ_API_KEY", "") or os.getenv("CEREBRAS_API_KEY", "")
+GROQ_API_KEY          = AI_API_KEY  # backward-compat для старых проверок
+# Дефолты под провайдера (можно переопределить env-переменными AI_BASE_URL/AI_MODEL)
+_AI_DEFAULTS = {
+    "groq":       ("https://api.groq.com/openai/v1/chat/completions", "llama-3.3-70b-versatile"),
+    "cerebras":   ("https://api.cerebras.ai/v1/chat/completions",      "llama-3.3-70b"),
+    "openrouter": ("https://openrouter.ai/api/v1/chat/completions",    "meta-llama/llama-3.3-70b-instruct:free"),
+    "openai":     ("https://api.openai.com/v1/chat/completions",       "gpt-4o-mini"),
+}
+_default_url, _default_model = _AI_DEFAULTS.get(AI_PROVIDER, _AI_DEFAULTS["cerebras"])
+AI_BASE_URL           = os.getenv("AI_BASE_URL", _default_url)
+AI_MODEL              = os.getenv("AI_MODEL", _default_model)
 DATABASE_URL          = os.getenv("DATABASE_URL", "")
 TELEGRAM_WEBHOOK_SECRET = os.getenv("TELEGRAM_WEBHOOK_SECRET", "")
 ALLOWED_ORIGINS       = [o.strip() for o in os.getenv("ALLOWED_ORIGINS", "*").split(",") if o.strip()]
 # "webhook" = этот FastAPI получает апдейты TG. "polling" = апдейты идёт в bot.py.
 BOT_MODE              = os.getenv("BOT_MODE", "webhook").lower()
+
+def _env_int(name: str, default: int) -> int:
+    """Безопасное чтение int из env: пустая строка → default."""
+    v = os.getenv(name, "").strip()
+    if not v:
+        return default
+    try:
+        return int(v)
+    except ValueError:
+        return default
+
 # Стоимость Premium в Telegram Stars (XTR). Можно менять без кода.
-PREMIUM_STARS_PRICE   = int(os.getenv("PREMIUM_STARS_PRICE", "129"))
-PREMIUM_DAYS          = int(os.getenv("PREMIUM_DAYS", "30"))
+PREMIUM_STARS_PRICE   = _env_int("PREMIUM_STARS_PRICE", 129)
+PREMIUM_DAYS          = _env_int("PREMIUM_DAYS", 30)
 
 # ── Rate limiter ─────────────────────────────────────────────────────────────
 limiter = Limiter(key_func=get_remote_address, default_limits=["120/minute"])
@@ -802,7 +827,13 @@ async def webapp_index():
 
 @app.get("/test-ai")
 async def test_ai():
-    return {"groq_key_set": bool(GROQ_API_KEY), "groq_key_length": len(GROQ_API_KEY) if GROQ_API_KEY else 0}
+    return {
+        "provider": AI_PROVIDER,
+        "model": AI_MODEL,
+        "base_url": AI_BASE_URL,
+        "key_set": bool(AI_API_KEY),
+        "key_length": len(AI_API_KEY) if AI_API_KEY else 0,
+    }
 
 @app.get("/player")
 async def find_player(query: str = Query(..., min_length=1)):
@@ -872,8 +903,8 @@ async def ai_chat(
     req: AIRequest,
     tg_user: Optional[TgUser] = Depends(optional_tg_user),
 ):
-    if not GROQ_API_KEY:
-        raise HTTPException(status_code=503, detail="AI not configured. Set GROQ_API_KEY.")
+    if not AI_API_KEY:
+        raise HTTPException(status_code=503, detail=f"AI not configured. Set AI_API_KEY ({AI_PROVIDER}).")
     # Приоритет у верифицированного TG-юзера
     telegram_id = tg_user.id if tg_user else req.telegram_id
     limit_check = None
@@ -894,10 +925,10 @@ Keep responses under 300 words."""
         content = f"Player data:\n{req.player_context}\n\n---\n{req.message}" if req.player_context else req.message
         messages = [{"role":"user","content":content}]
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            r = await client.post("https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization":f"Bearer {GROQ_API_KEY}","Content-Type":"application/json"},
-                json={"model":"llama-3.3-70b-versatile",
+        async with httpx.AsyncClient(timeout=45) as client:
+            r = await client.post(AI_BASE_URL,
+                headers={"Authorization":f"Bearer {AI_API_KEY}","Content-Type":"application/json"},
+                json={"model": AI_MODEL,
                       "messages":[{"role":"system","content":system}]+messages,
                       "max_tokens":1000,"temperature":0.7})
         if r.status_code != 200:
@@ -917,7 +948,7 @@ Keep responses under 300 words."""
 @app.post("/roast")
 @limiter.limit("10/minute")
 async def roast_player(request: Request, req: RoastRequest):
-    if not GROQ_API_KEY:
+    if not AI_API_KEY:
         raise HTTPException(status_code=503, detail="AI not configured")
     mode_prompts = {
         "toxic":   "You are a BRUTAL, SAVAGE Dota 2 roaster. Destroy this player with dark humor. Short punchy lines with emojis. Under 200 words. Write in Russian. End with a devastating verdict.",
@@ -926,10 +957,10 @@ async def roast_player(request: Request, req: RoastRequest):
         "brutal":  "You are the MOST SAVAGE Dota 2 roaster. MAXIMUM DESTRUCTION. Every line should hurt. Format with skull emojis 💀. Under 250 words. Write in Russian.",
     }
     try:
-        async with httpx.AsyncClient(timeout=30) as client:
-            r = await client.post("https://api.groq.com/openai/v1/chat/completions",
-                headers={"Authorization":f"Bearer {GROQ_API_KEY}","Content-Type":"application/json"},
-                json={"model":"llama-3.3-70b-versatile",
+        async with httpx.AsyncClient(timeout=45) as client:
+            r = await client.post(AI_BASE_URL,
+                headers={"Authorization":f"Bearer {AI_API_KEY}","Content-Type":"application/json"},
+                json={"model": AI_MODEL,
                       "messages":[{"role":"system","content":mode_prompts.get(req.mode,mode_prompts["toxic"])},
                                   {"role":"user","content":f"Roast this Dota 2 player:\n\n{req.player_context}"}],
                       "max_tokens":800,"temperature":0.9})
@@ -1180,14 +1211,18 @@ def require_premium(telegram_id: int) -> None:
 
 
 async def _groq_call(system: str, user_content: str, max_tokens: int = 1200, temperature: float = 0.6) -> str:
-    if not GROQ_API_KEY:
+    """
+    Универсальный AI-вызов (имя оставлено для обратной совместимости).
+    Провайдер определяется AI_PROVIDER env (groq/cerebras/openrouter/openai).
+    """
+    if not AI_API_KEY:
         raise HTTPException(status_code=503, detail="AI not configured")
     async with httpx.AsyncClient(timeout=45) as client:
         r = await client.post(
-            "https://api.groq.com/openai/v1/chat/completions",
-            headers={"Authorization": f"Bearer {GROQ_API_KEY}", "Content-Type": "application/json"},
+            AI_BASE_URL,
+            headers={"Authorization": f"Bearer {AI_API_KEY}", "Content-Type": "application/json"},
             json={
-                "model": "llama-3.3-70b-versatile",
+                "model": AI_MODEL,
                 "messages": [
                     {"role": "system", "content": system},
                     {"role": "user", "content": user_content},
@@ -1197,8 +1232,15 @@ async def _groq_call(system: str, user_content: str, max_tokens: int = 1200, tem
             },
         )
     if r.status_code != 200:
-        raise HTTPException(status_code=502, detail=f"AI request failed: {r.text[:200]}")
-    return r.json()["choices"][0]["message"]["content"]
+        # Логируем полную ошибку чтобы видеть в Railway logs что именно вернул провайдер
+        body = r.text[:500]
+        logger.error(f"AI {AI_PROVIDER} [{AI_MODEL}] HTTP {r.status_code}: {body}")
+        raise HTTPException(status_code=502, detail=f"AI [{AI_PROVIDER}] HTTP {r.status_code}: {body[:200]}")
+    try:
+        return r.json()["choices"][0]["message"]["content"]
+    except (KeyError, ValueError) as e:
+        logger.error(f"AI {AI_PROVIDER} bad response: {r.text[:500]}")
+        raise HTTPException(status_code=502, detail=f"AI bad response: {e}")
 
 
 @app.post("/ai/deep-analysis")
@@ -1560,8 +1602,8 @@ async def ai_duel(request: Request, user: TgUser = Depends(require_tg_user)):
 
 
 # ── REFERRALS ─────────────────────────────────────────────────────────────────
-REF_BONUS_COUNT = int(os.getenv("REF_BONUS_COUNT", "3"))   # сколько приглашённых нужно
-REF_BONUS_DAYS  = int(os.getenv("REF_BONUS_DAYS", "7"))    # за сколько дней Premium
+REF_BONUS_COUNT = _env_int("REF_BONUS_COUNT", 3)   # сколько приглашённых нужно
+REF_BONUS_DAYS  = _env_int("REF_BONUS_DAYS", 7)    # за сколько дней Premium
 
 
 def _get_or_create_ref_code(telegram_id: int) -> str:
@@ -1724,11 +1766,42 @@ async def get_premium_status(telegram_id: int = Query(...)):
 
 # ── TELEGRAM WEBHOOK ──────────────────────────────────────────────────────────
 async def tg_send(chat_id: int, text: str, reply_markup=None, parse_mode="HTML"):
+    """
+    Отправка сообщения в Telegram. При 400 (обычно битый HTML) автоматически
+    повторяет запрос без parse_mode — чтобы пользователь всё равно получил текст.
+    """
     url = f"https://api.telegram.org/bot{BOT_TOKEN}/sendMessage"
+    # Telegram ограничивает текст в 4096 символов
+    text = (text or "")[:4000]
     payload = {"chat_id": chat_id, "text": text, "parse_mode": parse_mode}
-    if reply_markup: payload["reply_markup"] = reply_markup
-    async with httpx.AsyncClient(timeout=10) as client:
-        await client.post(url, json=payload)
+    if reply_markup:
+        payload["reply_markup"] = reply_markup
+
+    try:
+        async with httpx.AsyncClient(timeout=10) as client:
+            r = await client.post(url, json=payload)
+        if r.status_code == 200:
+            return
+        # Telegram вернул ошибку — логируем и делаем fallback
+        try:
+            err_body = r.json()
+        except Exception:
+            err_body = r.text[:200]
+        logger.warning(f"tg_send {r.status_code}: {err_body}")
+        # 400 часто из-за битого HTML → шлём plain-text
+        if r.status_code == 400 and parse_mode:
+            fallback = dict(payload)
+            fallback.pop("parse_mode", None)
+            async with httpx.AsyncClient(timeout=10) as client:
+                r2 = await client.post(url, json=fallback)
+            if r2.status_code != 200:
+                try:
+                    err2 = r2.json()
+                except Exception:
+                    err2 = r2.text[:200]
+                logger.error(f"tg_send fallback failed {r2.status_code}: {err2}")
+    except Exception as e:
+        logger.error(f"tg_send exception chat_id={chat_id}: {e}")
 
 def format_player_message(data: dict) -> str:
     p = data["profile"]; s = data["stats"]; t = data.get("trend",{})
@@ -2150,4 +2223,4 @@ async def telegram_webhook(
 
 if __name__ == '__main__':
     import uvicorn
-    uvicorn.run(app, host='0.0.0.0', port=int(os.getenv('PORT', 8000)))
+    uvicorn.run(app, host='0.0.0.0', port=_env_int('PORT', 8000))
